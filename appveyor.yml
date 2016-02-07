@@ -24,14 +24,14 @@ build:
   verbosity: minimal
 test_script:
 - ps: >-
-   '.\appveyor\run_tests.ps1'
+   (& '.\appveyor\run_tests.ps1')
    
    if(($env:platform -eq "x64") -and ($env:configuration -eq "Debug"))
    {
       
-      '.\appveyor\run_codecoverage.ps1'
+      (& '.\appveyor\run_codecoverage.ps1')
       
-      '.\appveyor\post_coverage_results.ps1'
+      (& '.\appveyor\post_coverage_results.ps1')
    }
 
 #on_finish:
