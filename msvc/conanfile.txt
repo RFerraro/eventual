@@ -1,0 +1,8 @@
+[requires]
+gtest/1.7.0@lasote/stable
+
+[generators]
+# visual_studio
+
+[options]
+gtest:shared=False
