@@ -7,18 +7,32 @@ platform:
 - Win32
 - x64
 
+environment:
+  coveralls_token:
+    secure: orvUIm+Uf35nZKLvGr/dDNampXA8v64mzFd2oXvKz5NlsbG4xaYPfhazp+57sk3y
+
 cache:
 - '%USERPROFILE%\.conan'
 - '%USERPROFILE%\Downloads'
 install:
 - ps: '.\appveyor\install_conan.ps1'
+- ps: '.\appveyor\install_opencppcoverage.ps1'
 before_build:
 - ps: '.\appveyor\install_packages.ps1'
 build:
   project: .\msvc\eventual.sln
   verbosity: minimal
 test_script:
-- ps: '.\appveyor\run_tests.ps1'
+- ps: >-
+   '.\appveyor\run_tests.ps1'
+   
+   if(($env:platform -eq "x64") -and ($env:configuration -eq "Debug"))
+   {
+      
+      '.\appveyor\run_codecoverage.ps1'
+      
+      '.\appveyor\post_coverage_results.ps1'
+   }
 
 #on_finish:
 #- ps: $blockRdp = $true; iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
