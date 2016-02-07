@@ -1,0 +1,24 @@
+version: 0.9.1.{build}
+os: Visual Studio 2015
+configuration:
+- Debug
+- Release
+platform:
+- Win32
+- x64
+
+cache:
+- '%USERPROFILE%\.conan'
+- '%USERPROFILE%\Downloads'
+install:
+- ps: '.\appveyor\install_conan.ps1'
+before_build:
+- ps: '.\appveyor\install_packages.ps1'
+build:
+  project: .\msvc\eventual.sln
+  verbosity: minimal
+test_script:
+- ps: '.\appveyor\run_tests.ps1'
+
+#on_finish:
+#- ps: $blockRdp = $true; iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
