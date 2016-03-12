@@ -86,59 +86,78 @@ function Report-AppVeyor-Test-Status
     }
 }
 
-function Run-CodeCoverage
+function Discover-Tests
 {
     PROCESS
     {
-        Write-Host -ForegroundColor White ("Running Code Coverage For: " + $testPath)
-
-        # Redirect stderr, as OpenCppCoverage misuses it for informational messages
-        (& OpenCppCoverage.exe --export_type html:$testCoveragePath --export_type cobertura:$coberturaFile --modules $testPath --sources $includePath -- $testPath) 2>&1 | Write-Verbose 
+        (& $testPath --gtest_list_tests) | Write-Output
 
         if($LASTEXITCODE -ne 0)
         {
-            throw [System.String]::Format("Failed to generate code coverage, ExitCode: {0}.", $LASTEXITCODE)
+            throw "Failed to discover test cases."
         }
+    }
 
-        while(-Not (Test-Path $coberturaFile))
+}
+
+function Run-Tests
+{
+    [CmdletBinding()]
+    param([Parameter()] [Switch]$WithCodeCoverage)
+    
+    PROCESS
+    {
+        if($WithCodeCoverage)
         {
-            Start-Sleep -s 1
+            Write-Host -ForegroundColor White ("Running Code Coverage For: " + $testPath)
+
+            (& OpenCppCoverage.exe --quiet --export_type html:$testCoveragePath --export_type cobertura:$coberturaFile --modules $testPath --sources $includePath -- $testPath) | Write-Output
+
+            if($LASTEXITCODE -ne 0)
+            {
+                throw [System.String]::Format("Failed to run tests to generate code coverage, ExitCode: {0}.", $LASTEXITCODE)
+            }
+
+            while(-Not (Test-Path $coberturaFile))
+            {
+                Start-Sleep -s 1
+            }
+
+            Write-Host -ForegroundColor White "Coverage analysis complete, pushing coverage file."
+
+            $coverageName = ("test_coverage(" + $testConfiguration + ")")
+            $coverageArchive = ($coverageName + ".zip")
+            (& 7z a -tzip $coverageArchive $testCoveragePath) | Write-Verbose 
+
+            if($LASTEXITCODE -ne 0)
+            {
+                Write-Error [System.String]::Format("Failed to generate code coverage artifact, ExitCode: {0}.", $LASTEXITCODE)
+            }
+
+            Push-AppveyorArtifact $coverageArchive -DeploymentName $testConfiguration
+            Push-AppveyorArtifact $coberturaFile -DeploymentName $testConfiguration
         }
-
-        Write-Host -ForegroundColor White "Coverage analysis complete, pushing coverage file."
-
-        $coverageName = ("test_coverage(" + $testConfiguration + ")")
-        $coverageArchive = ($coverageName + ".zip")
-        (& 7z a -tzip $coverageArchive $testCoveragePath) | Write-Verbose 
-
-        if($LASTEXITCODE -ne 0)
+        else
         {
-            Write-Error [System.String]::Format("Failed to generate code coverage artifact, ExitCode: {0}.", $LASTEXITCODE)
-        }
+            (& $testPath) | Write-Output
 
-        Push-AppveyorArtifact $coverageArchive -DeploymentName $testConfiguration
-        Push-AppveyorArtifact $coberturaFile -DeploymentName $testConfiguration
+            if($LASTEXITCODE -ne 0)
+            {
+                throw [System.String]::Format("TestRun failed, ExitCode: {0}.", $LASTEXITCODE)
+            }
+        }
     }
 }
 
 Write-Host -ForegroundColor White ("Testing: " + $testPath)
 
-(& $testPath --gtest_list_tests) | Out-String -Stream | Read-Test-Case | Create-AppVeyor-Test
-
-if($LASTEXITCODE -ne 0)
-{
-    throw "Failed to discover test cases."
-}
-
-(& $testPath) | Out-String -Stream | Read-Test-Status | Report-AppVeyor-Test-Status
-
-if($LASTEXITCODE -ne 0)
-{
-    throw [System.String]::Format("TestRun failed, ExitCode: {0}.", $LASTEXITCODE)
-}
+Discover-Tests | Out-String -Stream | Read-Test-Case | Create-AppVeyor-Test
 
 if(($env:platform -eq "x64") -and ($env:configuration -eq "Debug"))
 {
-   Run-CodeCoverage
+    Run-Tests -WithCodeCoverage | Out-String -Stream | Read-Test-Status | Report-AppVeyor-Test-Status
 }
-
+else
+{
+    Run-Tests | Out-String -Stream | Read-Test-Status | Report-AppVeyor-Test-Status
+}
