@@ -23,16 +23,8 @@ build:
   project: .\msvc\eventual.sln
   verbosity: minimal
 test_script:
-- ps: >-
-   (& '.\appveyor\run_tests.ps1')
-   
-   if(($env:platform -eq "x64") -and ($env:configuration -eq "Debug"))
-   {
-      
-      (& '.\appveyor\run_codecoverage.ps1')
-      
-      (& '.\appveyor\post_coverage_results.ps1')
-   }
+- ps: '.\appveyor\run_tests.ps1'
+- ps: '.\appveyor\post_coverage_results.ps1'
 
 #on_finish:
 #- ps: $blockRdp = $true; iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))

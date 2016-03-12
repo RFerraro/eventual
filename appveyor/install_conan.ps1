@@ -11,16 +11,19 @@ if(-Not (Test-Path $conanInstallerPath))
 
 Write-Host -ForegroundColor White "Installing Conan..."
 
-# Pipe the output so powershell waits for completion
-(& $conanInstallerPath /VERYSILENT) | Out-Null
+$installProcess = (Start-Process $conanInstallerPath -ArgumentList '/VERYSILENT' -PassThru -Wait)
+if($installProcess.ExitCode -ne 0)
+{
+    throw [System.String]::Format("Failed to install the Conan Package Manager, ExitCode: {0}.", $installProcess.ExitCode)
+}
 
 $env:Path="$env:Path;$conanInstallPath"
-
-while(-Not (Test-Path $conanExe))
-{
-    Start-Sleep -s 1
-}
 
 Write-Host -ForegroundColor White "Conan Installed"
 
 (& $conanExe --version) | Write-Host -ForegroundColor White
+
+if($LASTEXITCODE -ne 0)
+{
+    throw [System.String]::Format("Failed to check the Conan Package Manager version, ExitCode: {0}.", $LASTEXITCODE)
+}

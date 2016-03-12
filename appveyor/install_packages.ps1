@@ -28,3 +28,8 @@ if($env:CONFIGURATION -eq "Release")
 
 Write-Host -ForegroundColor White ("Installing Conan packages for: " + $buildConfiguration  + "/" + $buildPlatform + "/" + $buildCompilerRuntime)
 Write-Host -ForegroundColor White (&conan install $buildFolder -s arch=$buildPlatform -s build_type=$buildConfiguration -s compiler=$buildCompiler -s compiler.version=$buildCompilerVersion -s compiler.runtime=$buildCompilerRuntime -s os=$buildCompilerOS)
+
+if($LASTEXITCODE -ne 0)
+{
+    throw [System.String]::Format("Conan failed to install all the project dependencies, ExitCode: {0}.", $LASTEXITCODE) 
+}

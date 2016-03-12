@@ -181,32 +181,35 @@ function Post-To_Coveralls
 
 $coberturaFile = [System.IO.Path]::Combine($buildPath, "coverage_results.xml")
 
-Write-Host ("Loading Coverage File: " + $coberturaFile)
+if(Test-Path $coberturaFile)
+{
+    Write-Host ("Loading Coverage File: " + $coberturaFile)
 
-[xml]$coverage = Get-Content $coberturaFile
+    [xml]$coverage = Get-Content $coberturaFile
 
-$runTime = [System.DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss zzz")
-$gitInfo = Create-Git-Info
-$sourceFiles = @($coverage.coverage.packages | Read-Packages)
+    $runTime = [System.DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss zzz")
+    $gitInfo = Create-Git-Info
+    $sourceFiles = @($coverage.coverage.packages | Read-Packages)
 
-$msg = [PSCustomObject]@{
-    repo_token = "[Secure]"
-    service_name = "appveyor-ps"
-    service_number = $buildNumber
-    service_branch = $branchName
-    service_build_url = $buildUrl
-    service_job_id = $buildJobID
-    service_pull_request = $pullRequestNumber
-    commit_sha = $commitID
-    run_at = $runTime
-    git = $gitInfo
-    source_files = $sourceFiles
+    $msg = [PSCustomObject]@{
+        repo_token = "[Secure]"
+        service_name = "appveyor-ps"
+        service_number = $buildNumber
+        service_branch = $branchName
+        service_build_url = $buildUrl
+        service_job_id = $buildJobID
+        service_pull_request = $pullRequestNumber
+        commit_sha = $commitID
+        run_at = $runTime
+        git = $gitInfo
+        source_files = $sourceFiles
+    }
+
+    if($msg.service_pull_request -eq $null){
+        $msg = $msg | Select-Object -Property * -ExcludeProperty service_pull_request
+    }
+
+    $msg | Post-To_Coveralls
+
+    Write-Host "Finished Posting to Coveralls"
 }
-
-if($msg.service_pull_request -eq $null){
-    $msg = $msg | Select-Object -Property * -ExcludeProperty service_pull_request
-}
-
-$msg | Post-To_Coveralls
-
-Write-Host "Finished Posting to Coveralls"
