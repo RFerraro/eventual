@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
-    <_PropertySheetDisplayName>Google Test (Conan @lasote/stable)</_PropertySheetDisplayName>
+    <_PropertySheetDisplayName>Google Test (Conan @RFerraro/stable)</_PropertySheetDisplayName>
   </PropertyGroup>
 
   <PropertyGroup Label="UserMacros" Condition="'$(Configuration)|$(PlatformTarget)'=='Release|x86'">
@@ -20,7 +20,7 @@
   <PropertyGroup Label="UserMacros">
     <ConanDir>$([System.IO.Path]::GetFullPath('$(USERPROFILE)\.conan\data'))</ConanDir>
     <GTestVersion>1.7.0</GTestVersion>
-    <GTestDir>$([System.IO.Path]::Combine('$(ConanDir)', 'gtest', '$(GTestVersion)', 'lasote\stable\package', '$(GTestHash)'))</GTestDir>
+    <GTestDir>$([System.IO.Path]::Combine('$(ConanDir)', 'gtest', '$(GTestVersion)', 'RFerraro\stable\package', '$(GTestHash)'))</GTestDir>
   </PropertyGroup>
   <ItemDefinitionGroup>
     <ClCompile>
