@@ -207,6 +207,19 @@ TEST(PackagedTaskTest, Execute_ForwardsTaskExceptions)
    EXPECT_THROW(future.Get(), PackagedTaskTestException);
 }
 
+TEST(PackagedTaskTest, Execute_ForwardsTaskExceptions_FutureError)
+{
+   // Arrange
+   Packaged_Task<int(int)> task([](int i) -> int { throw future_error(std::make_error_code(future_errc::no_state)); });
+   auto future = task.Get_Future();
+
+   // Act
+   task(0);
+
+   // Assert
+   EXPECT_THROW(future.Get(), future_error);
+}
+
 TEST(PackagedTaskTest, Execute_ThrowsIfTaskIsInvalid)
 {
    // Arrange
@@ -257,6 +270,37 @@ TEST(PackagedTaskTest, MakeReadyAtThreadExit_FullfillsTaskPromise)
    EXPECT_EQ(expected, future.Get());
 }
 
+TEST(PackagedTaskTest, MakeReadyAtThreadExitVoid_FullfillsTaskPromise)
+{
+   // Arrange
+   int expected = 5;
+   Packaged_Task<void(int)> task([](int i) { });
+   auto future = task.Get_Future();
+
+   std::mutex m;
+   std::condition_variable cv;
+   bool ready = false;
+
+   // Act
+   std::thread worker([&]()
+   {
+      task.Make_Ready_At_Thread_Exit(expected);
+
+      std::unique_lock<std::mutex> l(m);
+      cv.wait(l, [&]() { return ready; });
+   });
+
+   // Assert
+   EXPECT_FALSE(future.Is_Ready()) << "The value changed signal was set prematurely.";
+   {
+      std::unique_lock<std::mutex> l(m);
+      ready = true;
+   }
+   cv.notify_all();
+   worker.join();
+   EXPECT_TRUE(future.Is_Ready());
+}
+
 TEST(PackagedTaskTest, MakeReadyAtThreadExit_ForwardsTaskExceptions)
 {
    // Arrange
@@ -285,6 +329,36 @@ TEST(PackagedTaskTest, MakeReadyAtThreadExit_ForwardsTaskExceptions)
    cv.notify_all();
    worker.join();
    EXPECT_THROW(future.Get(), PackagedTaskTestException);
+}
+
+TEST(PackagedTaskTest, MakeReadyAtThreadExit_ForwardsTaskExceptions_FutureError)
+{
+   // Arrange
+   Packaged_Task<int(int)> task([](int i) -> int { throw future_error(std::make_error_code(future_errc::no_state)); });
+   auto future = task.Get_Future();
+
+   std::mutex m;
+   std::condition_variable cv;
+   bool ready = false;
+
+   // Act
+   std::thread worker([&]()
+   {
+      task.Make_Ready_At_Thread_Exit(3);
+
+      std::unique_lock<std::mutex> l(m);
+      cv.wait(l, [&]() { return ready; });
+   });
+
+   // Assert
+   EXPECT_FALSE(future.Is_Ready()) << "The value changed signal was set prematurely.";
+   {
+      std::unique_lock<std::mutex> l(m);
+      ready = true;
+   }
+   cv.notify_all();
+   worker.join();
+   EXPECT_THROW(future.Get(), future_error);
 }
 
 TEST(PackagedTaskTest, MakeReadyAtThreadExit_ThrowsIfTaskIsInvalid)

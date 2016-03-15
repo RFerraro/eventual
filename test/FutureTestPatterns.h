@@ -471,6 +471,36 @@ TYPED_TEST_P(FutureTestPatterns, Then_ReturnsFutureWithNestedFuturesExceptionWhe
    EXPECT_THROW(unwrapped.Get(), FutureTestException) << "Future::Then failed to unwrap a nested future and return its exception.";
 }
 
+TYPED_TEST_P(FutureTestPatterns, Then_ReturnsFutureWithNoStateExceptionWhenInnerFutureHasNoState)
+{
+   // Arrange
+   Promise<void> promise;
+   auto outerFuture = promise.Get_Future();
+
+   // Act
+   auto unwrapped = outerFuture.Then([](auto& f)
+   {
+      auto future = MakeCompleteFuture();
+      future_t moved(std::move(future));
+      
+      return future;
+   });
+   promise.Set_Value();
+
+   // Assert
+
+   try
+   {
+      unwrapped.Get();
+      FAIL() << "Future::Then failed to throw an exception";
+   }
+   catch (const future_error& e)
+   {
+      
+      EXPECT_EQ(future_errc::no_state, e.code()) << "Future::Then failed to unwrap a nested future and return a no-state exception.";
+   }
+}
+
 // ignore VS intellisense errors...
 REGISTER_TYPED_TEST_CASE_P(FutureTestPatterns,
                            DefaultConstructorCreatesInvalidFuture, 
@@ -496,4 +526,5 @@ REGISTER_TYPED_TEST_CASE_P(FutureTestPatterns,
                            Then_ThrowsWhenFutureIsInvalid,
                            Then_ReturnsFutureWithCapturedExceptionOfContinuation,
                            Then_ReturnsFutureWithCompletedNestedFuturesException,
-                           Then_ReturnsFutureWithNestedFuturesExceptionWhenComplete);
+                           Then_ReturnsFutureWithNestedFuturesExceptionWhenComplete,
+                           Then_ReturnsFutureWithNoStateExceptionWhenInnerFutureHasNoState);

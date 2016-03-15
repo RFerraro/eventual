@@ -3,6 +3,7 @@
 #include <memory>
 #include <thread>
 #include <chrono>
+#include <atomic>
 #include <eventual\eventual.h>
 #include "FutureTestPatterns.h"
 #include "NonCopyable.h"
@@ -193,6 +194,118 @@ TEST(FutureTest_Void, Get_ReturnsVoidWhenReady)
 
    // Assert (-ish, more of a compile-time constant)
    EXPECT_TRUE(std::is_void<std::result_of<decltype(&Future<void>::Get)(Future<void>)>::type>::value) << "Future<void>::Get() does not return void.";
+}
+
+TEST(FutureTest_Value, Get_BlocksUntilReady)
+{
+   // Arrange
+   auto promise = Promise<int>();
+   auto future = promise.Get_Future();
+   std::atomic_bool actual(false);
+
+   std::mutex m;
+   std::condition_variable cv;
+   bool ready = false;
+
+   // Act
+   std::thread worker([&]()
+   {
+      {
+         std::unique_lock<std::mutex> l(m);
+         ready = true;
+      }
+      cv.notify_all();
+      
+      future.Get();
+      actual.store(true);
+   });
+
+   std::unique_lock<std::mutex> l(m);
+   cv.wait(l, [&]() { return ready; });
+   std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+   EXPECT_FALSE(future.Is_Ready());
+   EXPECT_FALSE(actual.load());
+   promise.Set_Value(4);
+
+   // Assert
+   worker.join();
+   EXPECT_TRUE(actual.load());
+}
+
+TEST(FutureTest_Reference, Get_BlocksUntilReady)
+{
+   // Arrange
+   int expectedValue = 5;
+   auto promise = Promise<int&>();
+   auto future = promise.Get_Future();
+   std::atomic_bool actual(false);
+
+   std::mutex m;
+   std::condition_variable cv;
+   bool ready = false;
+
+   // Act
+   std::thread worker([&]()
+   {
+      {
+         std::unique_lock<std::mutex> l(m);
+         ready = true;
+      }
+      cv.notify_all();
+      
+      future.Get();
+      actual.store(true);
+   });
+
+   std::unique_lock<std::mutex> l(m);
+   cv.wait(l, [&]() { return ready; });
+   std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+   EXPECT_FALSE(future.Is_Ready());
+   EXPECT_FALSE(actual.load());
+   promise.Set_Value(expectedValue);
+
+   // Assert
+   worker.join();
+   EXPECT_TRUE(actual.load());
+}
+
+TEST(FutureTest_Void, Get_BlocksUntilReady)
+{
+   // Arrange
+   auto promise = Promise<void>();
+   auto future = promise.Get_Future();
+   std::atomic_bool actual(false);
+
+   std::mutex m;
+   std::condition_variable cv;
+   bool ready = false;
+
+   // Act
+   std::thread worker([&]()
+   {
+      {
+         std::unique_lock<std::mutex> l(m);
+         ready = true;
+      }
+      cv.notify_all();
+      
+      future.Get();
+      actual.store(true);
+   });
+
+   std::unique_lock<std::mutex> l(m);
+   cv.wait(l, [&]() { return ready; });
+   std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+   EXPECT_FALSE(future.Is_Ready());
+   EXPECT_FALSE(actual.load());
+   promise.Set_Value();
+
+   // Assert
+   worker.join();
+   EXPECT_TRUE(actual.load());
 }
 
 TEST(FutureTest_Value, Then_InvokesContinuationWhenComplete)
