@@ -839,15 +839,6 @@ namespace eventual
             return state->SetResult(std::forward<T>(value)...);
          }
 
-         bool Try_Set_Exception(std::exception_ptr exceptionPtr) noexcept
-         {
-            auto state = _state;
-            if (!state)
-               return false;
-
-            return state->SetException(exceptionPtr);
-         }
-
          void Reset()
          {
             // todo: save allocator somewhere?
@@ -869,52 +860,11 @@ namespace eventual
             return state;
          }
 
-         void VerifyPromiseNotSatisfied()
-         {
-            if (_state->HasResult())
-               ThrowFutureError(future_errc::promise_already_satisfied);
-         }
-
-         void NotifyPromiseFullfilled()
-         {
-            _state->NotifyPromiseFullfilled();
-         }
-
       private:
 
          static Future<R> CreateFuture(SharedState state) noexcept
          {
             return FutureHelper::CreateFuture<Future<R>>(std::forward<SharedState>(state));
-         }
-
-         bool TrySetExceptionInternal(std::exception_ptr ex)
-         {
-            struct Anonymous { };
-
-            if (_state->HasResult())
-               return false;
-            _state->SetException(ex ? ex : std::make_exception_ptr(Anonymous()));
-
-            return true;
-         }
-
-         template<class T>
-         bool TrySetValueInternal(T&& value) noexcept
-         {
-            if (_state->HasResult())
-               return false;
-            _state->SetResult(std::forward<T>(value));
-
-            return true;
-         }
-
-         bool TrySetValueInternal() noexcept
-         {
-            if (_state->HasResult())
-               return false;
-            _state->SetResult();
-
-            return true;
          }
 
          SharedState _state;
@@ -1231,23 +1181,6 @@ namespace eventual
          {
             auto state = future.ValidateState();
             state->GetResult();
-         }
-
-         template<class T>
-         static void CheckException(BasicFuture<T, Future<T>>& future)
-         {
-            if (future._state->HasException())
-            {
-               auto state = std::move(future._state);
-               std::rethrow_exception(state->GetException());
-            }
-         }
-
-         template<class T>
-         static void CheckException(BasicFuture<T, Shared_Future<T>>& future)
-         {
-            if (future._state->HasException())
-               std::rethrow_exception(future._state->GetException());
          }
 
          SharedState _state;
