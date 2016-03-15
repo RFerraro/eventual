@@ -141,7 +141,7 @@ namespace eventual
          //do nothing
       }
 
-      inline void ThrowFutureError(future_errc error);
+      inline future_error CreateFutureError(future_errc error);
       inline std::exception_ptr CreateFutureExceptionPtr(future_errc error);
 
       // Detail classes
@@ -316,9 +316,6 @@ namespace eventual
          // lock before calling
          void SetResult(const BasicState& other)
          {
-            if(!SetHasResult())
-               ThrowFutureError(future_errc::promise_already_satisfied);
-
             _hasResult = other._hasResult;
             _exception = other._exception;
          }
@@ -554,7 +551,7 @@ namespace eventual
       {
       public:
 
-         void SetResult(State& other)
+         void SetResult(const State& other)
          {
             {
                auto lock = AquireLock();
@@ -753,7 +750,6 @@ namespace eventual
       class BasicPromise
       {
          using SharedState = std::shared_ptr<State<R>>;
-         using unique_lock = std::unique_lock<std::mutex>;
          friend class FutureHelper;
       public:
          BasicPromise() : _state(std::make_shared<State<R>>()) { }
@@ -788,7 +784,7 @@ namespace eventual
             auto state = ValidateState();
 
             if(!state->SetRetrieved())
-               ThrowFutureError(future_errc::future_already_retrieved);
+               throw CreateFutureError(future_errc::future_already_retrieved);
 
             return CreateFuture(state);
          }
@@ -801,7 +797,7 @@ namespace eventual
             auto state = ValidateState();
 
             if(!state->SetResult(std::forward<T>(value)...))
-               ThrowFutureError(future_errc::promise_already_satisfied);
+               throw CreateFutureError(future_errc::promise_already_satisfied);
          }
 
          template<class... T>
@@ -810,7 +806,7 @@ namespace eventual
             auto state = ValidateState();
 
             if(!state->SetResultAtThreadExit(std::forward<T>(value)...))
-               ThrowFutureError(future_errc::promise_already_satisfied);
+               throw CreateFutureError(future_errc::promise_already_satisfied);
          }
 
          void SetException(std::exception_ptr exceptionPtr)
@@ -818,7 +814,7 @@ namespace eventual
             auto state = ValidateState();
 
             if(!state->SetException(exceptionPtr))
-               ThrowFutureError(future_errc::promise_already_satisfied);
+               throw CreateFutureError(future_errc::promise_already_satisfied);
          }
 
          void SetExceptionAtThreadExit(std::exception_ptr exceptionPtr)
@@ -826,26 +822,14 @@ namespace eventual
             auto state = ValidateState();
 
             if(!state->SetExceptionAtThreadExit(exceptionPtr))
-               ThrowFutureError(future_errc::promise_already_satisfied);
+               throw CreateFutureError(future_errc::promise_already_satisfied);
          }
 
          template<class... T>
          bool TrySetValue(T&&... value) noexcept
          {
-            auto state = _state;
-            if(!state)
-               return false;
-            
+            auto state = ValidateState();
             return state->SetResult(std::forward<T>(value)...);
-         }
-
-         bool Try_Set_Exception(std::exception_ptr exceptionPtr) noexcept
-         {
-            auto state = _state;
-            if (!state)
-               return false;
-
-            return state->SetException(exceptionPtr);
          }
 
          void Reset()
@@ -864,20 +848,9 @@ namespace eventual
          {
             auto state = _state;
             if(!state)
-               ThrowFutureError(future_errc::no_state);
+               throw CreateFutureError(future_errc::no_state);
 
             return state;
-         }
-
-         void VerifyPromiseNotSatisfied()
-         {
-            if (_state->HasResult())
-               ThrowFutureError(future_errc::promise_already_satisfied);
-         }
-
-         void NotifyPromiseFullfilled()
-         {
-            _state->NotifyPromiseFullfilled();
          }
 
       private:
@@ -885,36 +858,6 @@ namespace eventual
          static Future<R> CreateFuture(SharedState state) noexcept
          {
             return FutureHelper::CreateFuture<Future<R>>(std::forward<SharedState>(state));
-         }
-
-         bool TrySetExceptionInternal(std::exception_ptr ex)
-         {
-            struct Anonymous { };
-
-            if (_state->HasResult())
-               return false;
-            _state->SetException(ex ? ex : std::make_exception_ptr(Anonymous()));
-
-            return true;
-         }
-
-         template<class T>
-         bool TrySetValueInternal(T&& value) noexcept
-         {
-            if (_state->HasResult())
-               return false;
-            _state->SetResult(std::forward<T>(value));
-
-            return true;
-         }
-
-         bool TrySetValueInternal() noexcept
-         {
-            if (_state->HasResult())
-               return false;
-            _state->SetResult();
-
-            return true;
          }
 
          SharedState _state;
@@ -1118,11 +1061,11 @@ namespace eventual
                   {
                      innerState->SetCallback([futureState, innerState]()
                      {
-                        futureState->SetResult(*innerState); // todo: may throw
+                        futureState->SetResult(*innerState);
                      });
                   }
                   else
-                     futureState->SetException(std::make_exception_ptr(std::exception("no state"))); // todo: better error.
+                     futureState->SetException(CreateFutureExceptionPtr(future_errc::no_state));
                }
                else
                   futureState->SetException(outerState->GetException());
@@ -1132,8 +1075,8 @@ namespace eventual
          SharedState ValidateState() const
          {
             auto state = _state;
-            if(!state)
-               ThrowFutureError(future_errc::no_state);
+            if (!state)
+               throw CreateFutureError(future_errc::no_state);
 
             return state;
          }
@@ -1231,23 +1174,6 @@ namespace eventual
          {
             auto state = future.ValidateState();
             state->GetResult();
-         }
-
-         template<class T>
-         static void CheckException(BasicFuture<T, Future<T>>& future)
-         {
-            if (future._state->HasException())
-            {
-               auto state = std::move(future._state);
-               std::rethrow_exception(state->GetException());
-            }
-         }
-
-         template<class T>
-         static void CheckException(BasicFuture<T, Shared_Future<T>>& future)
-         {
-            if (future._state->HasException())
-               std::rethrow_exception(future._state->GetException());
          }
 
          SharedState _state;
@@ -1591,10 +1517,10 @@ namespace detail
       return Make_Ready_Future<result_t>(std::move(result));
    }
 
-   void ThrowFutureError(future_errc error)
+   future_error CreateFutureError(future_errc error)
    {
       auto code = std::make_error_code(error);
-      throw future_error(code);
+      return future_error(code);
    }
 
    std::exception_ptr CreateFutureExceptionPtr(future_errc error)
@@ -1602,7 +1528,7 @@ namespace detail
       std::exception_ptr ptr;
       try
       {
-         ThrowFutureError(error);
+         throw CreateFutureError(error);
       }
       catch (const future_error&)
       {

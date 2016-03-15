@@ -242,9 +242,23 @@ TYPED_TEST(PromiseTest, SetExceptionAtThreadExit_ThrowsIfStateIsInvalid)
    // Arrange
    Promise<TypeParam> promise;
    Promise<TypeParam> moved(std::move(promise));
+   std::atomic_bool result(false);
+
+   std::thread worker([&]()
+   {
+      try
+      {
+         promise.Set_Exception_At_Thread_Exit(std::make_exception_ptr(PromiseTestException()));
+      }
+      catch (const future_error&)
+      {
+         result.store(true);
+      }
+   });
+   worker.join();
 
    // Act/Assert
-   EXPECT_THROW(promise.Set_Exception_At_Thread_Exit(std::make_exception_ptr(PromiseTestException())), future_error) << "Promise set an exception on invalid state.";
+   EXPECT_TRUE(result.load()) << "Promise set an exception on invalid state.";
 }
 
 TYPED_TEST(PromiseTest, SetExceptionAtThreadExit_ThrowsIfPromiseSatisfied)
@@ -252,10 +266,30 @@ TYPED_TEST(PromiseTest, SetExceptionAtThreadExit_ThrowsIfPromiseSatisfied)
    // Arrange
    auto exPtr = std::make_exception_ptr(PromiseTestException());
    Promise<TypeParam> promise;
-   promise.Set_Exception_At_Thread_Exit(exPtr);
+   std::atomic_bool result(false);
 
-   // Act/Assert
-   EXPECT_THROW(promise.Set_Exception_At_Thread_Exit(exPtr), future_error) << "Promise set an exception when already satisfied.";
+   // Act
+   std::thread worker([&]()
+   {
+      try
+      {
+         promise.Set_Exception_At_Thread_Exit(exPtr);
+      }
+      catch (...) { }
+
+      try
+      {
+         promise.Set_Exception_At_Thread_Exit(exPtr);
+      }
+      catch (const future_error&)
+      {
+         result.store(true);
+      }
+   });
+   worker.join();
+
+   // Assert
+   EXPECT_TRUE(result.load()) << "Promise set an exception when already satisfied.";
 }
 
 // Set_Value
@@ -404,8 +438,6 @@ TEST(PromiseTest_Void, SetValue_ThrowsIfStateIsInvalid)
    EXPECT_THROW(promise.Set_Value(), future_error) << "Set_Value did not throw an error when setting a value to an invalid promise.";
 }
 
-// Set_Value_At_Thread_Exit
-
 TEST(PromiseTest_Value, SetValueAtThreadExit_CopiesValueIntoState)
 {
    // Arrange
@@ -440,14 +472,65 @@ TEST(PromiseTest_Value, SetValueAtThreadExit_CopiesValueIntoState)
    EXPECT_EQ(expected, actual) << "The returned value was not what was expected.";
 }
 
-TEST(PromiseTest_Value, SetValueAtThreadExit_ThrowsIfCopiedValueIntoStateMultipleTimes)
+TEST(PromiseTest_Value, SetValueAtThreadExit_ThrowsIfCopiedValueIntoStateMultipleTimes_RValue)
 {
    // Arrange
    Promise<int> promise;
-   promise.Set_Value_At_Thread_Exit(3);
+   std::atomic_bool result(false);
 
-   // Act/Assert
-   EXPECT_THROW(promise.Set_Value_At_Thread_Exit(4), future_error) << "SetValue allowed changing the value after being set.";
+   // Act
+   std::thread worker([&]()
+   {
+      try
+      {
+         promise.Set_Value_At_Thread_Exit(3);
+      }
+      catch (...) { }
+
+      try
+      {
+         promise.Set_Value_At_Thread_Exit(4);
+      }
+      catch (const future_error&)
+      {
+         result.store(true);
+      }
+   });
+   worker.join();
+
+   // Assert
+   EXPECT_TRUE(result.load()) << "SetValue allowed changing the value after being set.";
+}
+
+TEST(PromiseTest_Value, SetValueAtThreadExit_ThrowsIfCopiedValueIntoStateMultipleTimes_LValue)
+{
+   // Arrange
+   Promise<int> promise;
+   std::atomic_bool result(false);
+
+   // Act
+   std::thread worker([&]()
+   {
+      auto lValue = 4;
+      try
+      {
+         promise.Set_Value_At_Thread_Exit(3);
+      }
+      catch (...) { }
+
+      try
+      {
+         promise.Set_Value_At_Thread_Exit(lValue);
+      }
+      catch (const future_error&)
+      {
+         result.store(true);
+      }
+   });
+   worker.join();
+
+   // Assert
+   EXPECT_TRUE(result.load()) << "SetValue allowed changing the value after being set.";
 }
 
 TEST(PromiseTest_Value, SetValueAtThreadExit_CopiesValueThrowsIfStateIsInvalid)
@@ -455,9 +538,24 @@ TEST(PromiseTest_Value, SetValueAtThreadExit_CopiesValueThrowsIfStateIsInvalid)
    // Arrange
    Promise<int> promise;
    Promise<int> moved(std::move(promise));
+   std::atomic_bool result(false);
 
-   // Act/Assert
-   EXPECT_THROW(promise.Set_Value_At_Thread_Exit(1), future_error) << "Set_Value did not throw an error when setting a value to an invalid promise.";
+   // Act
+   std::thread worker([&]()
+   {
+      try
+      {
+         promise.Set_Value_At_Thread_Exit(1);
+      }
+      catch (const future_error&)
+      {
+         result.store(true);
+      }
+   });
+   worker.join();
+
+   // Assert
+   EXPECT_TRUE(result.load()) << "Set_Value did not throw an error when setting a value to an invalid promise.";
 }
 
 TEST(PromiseTest_Value, SetValueAtThreadExit_MovesValueIntoState)
@@ -499,10 +597,30 @@ TEST(PromiseTest_Value, SetValueAtThreadExit_ThrowsIfMovedValueIntoStateMultiple
 {
    // Arrange
    Promise<NonCopyable> promise;
-   promise.Set_Value_At_Thread_Exit(NonCopyable());
+   std::atomic_bool result(false);
+
+   // Act
+   std::thread worker([&]()
+   {
+      try
+      {
+         promise.Set_Value_At_Thread_Exit(NonCopyable());
+      }
+      catch (...) { }
+
+      try
+      {
+         promise.Set_Value_At_Thread_Exit(NonCopyable());
+      }
+      catch (const future_error&)
+      {
+         result.store(true);
+      }
+   });
+   worker.join();
 
    // Act/Assert
-   EXPECT_THROW(promise.Set_Value_At_Thread_Exit(NonCopyable()), future_error) << "SetValue allowed changing the value after being set.";
+   EXPECT_TRUE(result.load()) << "SetValue allowed changing the value after being set.";
 }
 
 TEST(PromiseTest_Value, SetValueAtThreadExit_MoveValueThrowsIfStateIsInvalid)
@@ -510,9 +628,24 @@ TEST(PromiseTest_Value, SetValueAtThreadExit_MoveValueThrowsIfStateIsInvalid)
    // Arrange
    Promise<NonCopyable> promise;
    Promise<NonCopyable> moved(std::move(promise));
+   std::atomic_bool result(false);
 
-   // Act/Assert
-   EXPECT_THROW(promise.Set_Value_At_Thread_Exit(NonCopyable()), future_error) << "Set_Value did not throw an error when setting a value to an invalid promise.";
+   // Act
+   std::thread worker([&]()
+   {
+      try
+      {
+         promise.Set_Value_At_Thread_Exit(NonCopyable());
+      }
+      catch (const future_error&)
+      {
+         result.store(true);
+      }
+   });
+   worker.join();
+
+   // Assert
+   EXPECT_TRUE(result.load()) << "Set_Value did not throw an error when setting a value to an invalid promise.";
 }
 
 TEST(PromiseTest_Reference, SetValueAtThreadExit_SetsReferenceInState)
@@ -555,10 +688,30 @@ TEST(PromiseTest_Reference, SetValueAtThreadExit_ThrowsIfReferenceSetMultipleTim
    int first = 1;
    int second = 1;
    Promise<int&> promise;
-   promise.Set_Value_At_Thread_Exit(first);
+   std::atomic_bool result(false);
 
-   // Act/Assert
-   EXPECT_THROW(promise.Set_Value_At_Thread_Exit(second), future_error) << "SetValue allowed changing the reference after being set.";
+   // Act
+   std::thread worker([&]()
+   {
+      try
+      {
+         promise.Set_Value_At_Thread_Exit(first);
+      }
+      catch (...) { }
+
+      try
+      {
+         promise.Set_Value_At_Thread_Exit(second);
+      }
+      catch (const future_error&)
+      {
+         result.store(true);
+      }
+   });
+   worker.join();
+
+   // Assert
+   EXPECT_TRUE(result.load()) << "SetValue allowed changing the reference after being set.";
 }
 
 TEST(PromiseTest_Reference, SetValueAtThreadExit_ThrowsIfStateIsInvalid)
@@ -567,9 +720,24 @@ TEST(PromiseTest_Reference, SetValueAtThreadExit_ThrowsIfStateIsInvalid)
    int value = 1;
    Promise<int&> promise;
    Promise<int&> moved(std::move(promise));
+   std::atomic_bool result(false);
 
-   // Act/Assert
-   EXPECT_THROW(promise.Set_Value_At_Thread_Exit(value), future_error) << "Set_Value did not throw an error when setting a value to an invalid promise.";
+   // Act
+   std::thread worker([&]()
+   {
+      try
+      {
+         promise.Set_Value_At_Thread_Exit(value);
+      }
+      catch (const future_error&)
+      {
+         result.store(true);
+      }
+   });
+   worker.join();
+
+   // Assert
+   EXPECT_TRUE(result.load()) << "Set_Value did not throw an error when setting a value to an invalid promise.";
 }
 
 TEST(PromiseTest_Void, SetValueAtThreadExit_SignalsCompletion)
@@ -606,10 +774,30 @@ TEST(PromiseTest_Void, SetValueAtThreadExit_ThrowsIfSetMultipleTimes)
 {
    // Arrange
    Promise<void> promise;
-   promise.Set_Value_At_Thread_Exit();
+   std::atomic_bool result(false);
 
-   // Act/Assert
-   EXPECT_THROW(promise.Set_Value_At_Thread_Exit(), future_error) << "SetValue was called multiple times after being set.";
+   // Act
+   std::thread worker([&]()
+   {
+      try
+      {
+         promise.Set_Value_At_Thread_Exit();
+      }
+      catch (...) { }
+
+      try
+      {
+         promise.Set_Value_At_Thread_Exit();
+      }
+      catch (const future_error&)
+      {
+         result.store(true);
+      }
+   });
+   worker.join();
+
+   // Assert
+   EXPECT_TRUE(result.load()) << "SetValue was called multiple times after being set.";
 }
 
 TEST(PromiseTest_Void, SetValueAtThreadExit_ThrowsIfStateIsInvalid)
@@ -617,7 +805,22 @@ TEST(PromiseTest_Void, SetValueAtThreadExit_ThrowsIfStateIsInvalid)
    // Arrange
    Promise<void> promise;
    Promise<void> moved(std::move(promise));
+   std::atomic_bool result(false);
 
-   // Act/Assert
-   EXPECT_THROW(promise.Set_Value_At_Thread_Exit(), future_error) << "Set_Value did not throw an error when setting a value to an invalid promise.";
+   // Act
+   std::thread worker([&]()
+   {
+      try
+      {
+         promise.Set_Value_At_Thread_Exit();
+      }
+      catch (const future_error&)
+      {
+         result.store(true);
+      }
+   });
+   worker.join();
+
+   // Assert
+   EXPECT_TRUE(result.load()) << "Set_Value did not throw an error when setting a value to an invalid promise.";
 }
