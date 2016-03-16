@@ -14,6 +14,7 @@ $remoteUrl = ("https://github.com/" + $ENV:APPVEYOR_REPO_NAME + ".git")
 $buildPath = ([string]($Env:APPVEYOR_BUILD_FOLDER)).TrimEnd('\') + '\'
 
 $buildUrl = ("https://ci.appveyor.com/project/RFerraro/eventual/build/" + $buildNumber)
+$jobUrl = ("https://ci.appveyor.com/project/RFerraro/eventual/build/job/" + $buildJobID)
 
 function Read-Packages
 {
@@ -208,6 +209,10 @@ if(Test-Path $coberturaFile)
     if($msg.service_pull_request -eq $null){
         $msg = $msg | Select-Object -Property * -ExcludeProperty service_pull_request
     }
+
+    #temp
+    $msg = $msg | Select-Object -Property * -ExcludeProperty service_job_id
+
 
     $msg | Post-To_Coveralls
 
