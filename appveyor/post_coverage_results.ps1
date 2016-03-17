@@ -7,13 +7,15 @@ $committerName = $ENV:APPVEYOR_REPO_COMMIT_AUTHOR
 $committerEmail = $ENV:APPVEYOR_REPO_COMMIT_AUTHOR_EMAIL
 $commitMessage = $ENV:APPVEYOR_REPO_COMMIT_MESSAGE
 $pullRequestNumber = $ENV:APPVEYOR_PULL_REQUEST_NUMBER
-$buildNumber = $ENV:APPVEYOR_BUILD_VERSION
+$buildVersion = $ENV:APPVEYOR_BUILD_VERSION
+$buildNumber = [System.Int32]::Parse($ENV:APPVEYOR_BUILD_NUMBER)
 $buildJobID = $ENV:APPVEYOR_JOB_ID  
 $branchName = $ENV:APPVEYOR_REPO_BRANCH
 $remoteUrl = ("https://github.com/" + $ENV:APPVEYOR_REPO_NAME + ".git")
 $buildPath = ([string]($Env:APPVEYOR_BUILD_FOLDER)).TrimEnd('\') + '\'
+$commitTime = [System.DateTime]::Parse($ENV:APPVEYOR_REPO_COMMIT_TIMESTAMP)
 
-$buildUrl = ("https://ci.appveyor.com/project/RFerraro/eventual/build/" + $buildNumber)
+$buildUrl = ("https://ci.appveyor.com/project/RFerraro/eventual/build/" + $buildVersion)
 
 function Read-Packages
 {
@@ -191,10 +193,17 @@ if(Test-Path $coberturaFile)
     $gitInfo = Create-Git-Info
     $sourceFiles = @($coverage.coverage.packages | Read-Packages)
 
+    # encode a coveralls build number as: MMDD(AppVeyor BuildNumber)
+    # XX : number of months after 12/31/2015
+    # DD : Day of current month
+    $epoch = New-Object System.DateTime -ArgumentList @(2015, 12, 31)
+    $months = (($commitTime.Year - $epoch.Year) * 12) + ($commitTime.Month - $epoch.Month)
+    $serviceNumber = [System.String]::Format("{0:##}{1:00}{2:000}", $months, $commitTime.Day, $buildNumber)
+
     $msg = [PSCustomObject]@{
         repo_token = "[Secure]"
-        service_name = "appveyor-ps"
-        service_number = $buildNumber
+        service_name = "appveyor-custom"
+        service_number = $serviceNumber
         service_branch = $branchName
         service_build_url = $buildUrl
         service_job_id = $buildJobID

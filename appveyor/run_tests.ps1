@@ -153,11 +153,4 @@ Write-Host -ForegroundColor White ("Testing: " + $testPath)
 
 Discover-Tests | Out-String -Stream | Read-Test-Case | Create-AppVeyor-Test
 
-if(($env:platform -eq "x64") -and ($env:configuration -eq "Debug"))
-{
-    Run-Tests -WithCodeCoverage | Out-String -Stream | Read-Test-Status | Report-AppVeyor-Test-Status
-}
-else
-{
-    Run-Tests | Out-String -Stream | Read-Test-Status | Report-AppVeyor-Test-Status
-}
+Run-Tests -WithCodeCoverage | Out-String -Stream | Read-Test-Status | Report-AppVeyor-Test-Status
