@@ -1,4 +1,4 @@
-﻿$buildFolder = ".\msvc"
+﻿$buildFolder = "."
 $buildCompilerOS = "Windows"
 $buildCompiler = "Visual Studio"
 $buildCompilerVersion = 14
