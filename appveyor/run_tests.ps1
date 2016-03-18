@@ -3,7 +3,14 @@ $testCaseLine = "^([\w/]+).+$"
 $testNameLine = "^\s+(\w+)$"
 $lastTestCase = "unknown"
 $testExe = "test.exe"
-$testPath = [System.IO.Path]::Combine($Env:APPVEYOR_BUILD_FOLDER, "bin", $Env:PLATFORM, $Env:Configuration, $testExe)
+
+$platform = $Env:PLATFORM
+if($platform -eq "Win32")
+{
+    $platform = "x86"
+}
+
+$testPath = [System.IO.Path]::Combine($Env:APPVEYOR_BUILD_FOLDER, "bin", $platform, $Env:Configuration, $testExe)
 $includePath = [System.IO.Path]::Combine($Env:APPVEYOR_BUILD_FOLDER, "include", "eventual")
 $testCoveragePath = [System.IO.Path]::Combine($Env:APPVEYOR_BUILD_FOLDER, "coverage_results")
 $testConfiguration = ($env:CONFIGURATION + "-" + $env:PLATFORM)

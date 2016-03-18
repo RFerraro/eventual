@@ -21,10 +21,12 @@ cache:
 install:
 - ps: '.\appveyor\install_conan.ps1'
 - ps: '.\appveyor\install_opencppcoverage.ps1'
+- ps: '.\appveyor\install_premake.ps1'
 before_build:
 - ps: '.\appveyor\install_packages.ps1'
+- ps: '.\appveyor\generate_solution.ps1'
 build:
-  project: .\msvc\eventual.sln
+  project: .\build\vs2015\Eventual.sln
   verbosity: minimal
 test_script:
 - ps: '.\appveyor\run_tests.ps1'
