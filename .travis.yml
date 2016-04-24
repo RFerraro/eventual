@@ -1,6 +1,13 @@
 sudo: false
 language: cpp
 
+cache: 
+   pip: true
+   apt: true
+   directories:
+      - $HOME/.conan
+   
+
 matrix:
    fast-finish: true
    include:
@@ -35,7 +42,7 @@ install:
    - pip install --user conan
    - conan user
    - conan --version
-   - conan install . -s compiler=$COMPILER -s compiler.libcxx='libstdc++11' --build gtest
+   - conan install . -s compiler=$COMPILER -s compiler.libcxx='libstdc++11' --build=missing
    
 before_script:
    - mkdir build
