@@ -1,7 +1,7 @@
 #include "stdafx.h"
 #include <exception>
 #include <thread>
-#include <eventual\eventual.h>
+#include <eventual/eventual.h>
 #include "BasicAllocator.h"
 #include "NonCopyable.h"
 

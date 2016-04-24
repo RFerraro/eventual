@@ -11,7 +11,7 @@ struct BasicAllocator
    BasicAllocator(BasicAllocator&&) = default;
 
    template<class U>
-   explicit BasicAllocator(const BasicAllocator<U>& other)
+   BasicAllocator(const BasicAllocator<U>& other)
       : _allocatedObjects(other._allocatedObjects)
    { }
 
@@ -25,7 +25,7 @@ struct BasicAllocator
       return ptr;
    }
 
-   void deallocate(pointer p, std::size_t n)
+   void deallocate(pointer p, std::size_t)
    {
       ::operator delete(p);
       (*_allocatedObjects)--;

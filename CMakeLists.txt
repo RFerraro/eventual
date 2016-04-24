@@ -24,6 +24,15 @@ if (MSVC)
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /WX")
     set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} /DEBUG")
 
+elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+   #Clang 3.7
+   #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -Werror -Weverything")
+   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -Werror -Wall -Wextra -Wunreachable-code")
+   
+elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+   #GCC 5.2
+   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -Werror -Wall -Wextra -Wunreachable-code")
+   
 endif()
 
 add_subdirectory(src/sample)

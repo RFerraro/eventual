@@ -7,12 +7,12 @@
 #include <vector>
 #include <tuple>
 #include <exception>
-#include "eventual\eventual.h"
+#include "eventual/eventual.h"
 
 using namespace eventual;
 
 template<class T>
-void DoSomething(T& future)
+void DoSomething(T)
 {
    // do nothing
 }
@@ -21,15 +21,16 @@ template<class T>
 class Continuation
 {
 public:
-   void operator()(T& future) { }
+   void operator()(T) { }
 };
 
 void Sample_BasicContinuation()
 {
    Future<int> future1 = Make_Ready_Future(3);
-   future1.Then([](Future<int>& f)
+   future1.Then([](Future<int> f)
    {
       //immediately calls this lambda
+       f.Get();
    });
 
    // or call a pointer
@@ -47,6 +48,7 @@ void Sample_BasicContinuation()
    future4.Then([](Future<int&> f)
    {
       // not invoked until Promise<>::Set_Value(...) is called.
+      f.Get();
    });
    // ... do other stuff
    promise.Set_Value(refValue);
@@ -59,25 +61,27 @@ void Chaining_Continuations()
 
    Future<int> future = Make_Ready_Future(14);
    future
-      .Then([](Future<int>& f) { return 1.1f; })
-      .Then([](Future<float>& f) { return std::string(); })
-      .Then([](Future<std::string>& f)
+      .Then([](Future<int> f) { f.Get(); return 1.1f; })
+      .Then([](Future<float> f) { f.Get(); return std::string(); })
+      .Then([](Future<std::string> f)
          {
-            // nested futures are implicitly unwrapped
+             f.Get();
+             
+             // nested futures are implicitly unwrapped
             // so Future<Future<void>> becomes Future<void>
             // when returned from .Then()
             return Make_Ready_Future();
          })
-      .Then([](Future<void>& f) { });
+      .Then([](Future<void> f) { f.Get(); });
 
    // of course modern style type deduction is supported
 
    auto future2 = Make_Ready_Future(13);
    future2
-      .Then([](auto& f) { return 1.5; })
-      .Then([](auto& f) { return "something..."; })
-      .Then([](auto& f) { return std::tuple<>(); })
-      .Then([](auto& f) { return 0; });
+      .Then([](auto f) { f.Get(); return 1.5; })
+      .Then([](auto f) { f.Get(); return "something..."; })
+      .Then([](auto f) { f.Get(); return std::tuple<>(); })
+      .Then([](auto f) { f.Get(); return 0; });
 
 }
 
@@ -183,7 +187,7 @@ void Examples_Make_Exceptional_Future()
    }
 }
 
-int _tmain(int argc, _TCHAR* argv[])
+int main()
 {
    try
    {

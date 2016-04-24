@@ -2,7 +2,7 @@
 #include <exception>
 #include <memory>
 #include <vector>
-#include <eventual\eventual.h>
+#include <eventual/eventual.h>
 #include "NonCopyable.h"
 
 using namespace eventual;

@@ -29,6 +29,10 @@ if(MSVC)
    set(GTEST_LIBS_DEBUG ${CONAN_LIBS_GTEST})
    
    include_directories($<$<CONFIG:Debug>:${GTEST_INCLUDE_DEBUG}> $<$<CONFIG:Release>:${GTEST_INCLUDE_RELEASE}>)
+   
+else()
+   include(${CMAKE_SOURCE_DIR}/conanbuildinfo.cmake)
+   conan_basic_setup()
 endif()
 
 list(APPEND TEST_SOURCES EventualTests.cpp)
@@ -70,5 +74,7 @@ if(MSVC)
    foreach(lib_item ${GTEST_LIBS_DEBUG})
       target_link_libraries(Test debug ${lib_item})
    endforeach()
+else()
+   target_link_libraries(Test ${CONAN_LIBS})
 endif()
 
