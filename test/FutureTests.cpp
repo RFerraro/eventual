@@ -4,7 +4,7 @@
 #include <thread>
 #include <chrono>
 #include <atomic>
-#include <eventual\eventual.h>
+#include <eventual/eventual.h>
 #include "FutureTestPatterns.h"
 #include "NonCopyable.h"
 
@@ -87,7 +87,7 @@ TYPED_TEST(FutureTest, Then_InvalidatesFuture)
    auto future = MakeCompleteFuture<TypeParam>();
 
    // Act
-   future.Then([](auto& f) { });
+   future.Then([](auto) { });
 
    // Assert
    EXPECT_FALSE(future.Valid()) << "Future::Then failed to invalidate the future.";
@@ -317,7 +317,7 @@ TEST(FutureTest_Value, Then_InvokesContinuationWhenComplete)
    int actual = -1;
    
    // Act
-   future.Then([&actual](auto& f) { actual = f.Get(); });
+   future.Then([&actual](auto f) { actual = f.Get(); });
    promise.Set_Value(expected);
 
    // Assert
@@ -334,7 +334,7 @@ TEST(FutureTest_Reference, Then_InvokesContinuationWhenComplete)
    int* actualAddress = nullptr;
 
    // Act
-   future.Then([&actualAddress](auto& f)
+   future.Then([&actualAddress](auto f)
    { 
       auto& temp = f.Get();
       actualAddress = &temp;
@@ -353,7 +353,7 @@ TEST(FutureTest_Void, Then_InvokesContinuationWhenComplete)
    bool continuationCalled = false;
 
    // Act
-   future.Then([&continuationCalled](auto& f)
+   future.Then([&continuationCalled](auto f)
    {
       f.Get();
       continuationCalled = true;
@@ -372,7 +372,7 @@ TEST(FutureTest_Value, Then_UnwrapsAndReturnsNestedResultWhenComplete)
    int expected = 13;
 
    // Act
-   auto unwrapped = future.Then([](auto& f)
+   auto unwrapped = future.Then([](auto f)
    {
       Promise<int> inner;
       auto temp = f.Get() + 1;
@@ -395,7 +395,7 @@ TEST(FutureTest_Reference, Then_UnwrapsAndReturnsNestedResultWhenComplete)
    auto expectedAddress = &expected;
 
    // Act
-   auto unwrapped = future.Then([](auto& f)
+   auto unwrapped = future.Then([](auto f)
    {
       Promise<int&> inner;
       auto& temp = f.Get();
@@ -418,7 +418,7 @@ TEST(FutureTest_Void, Then_UnwrapsAndReturnsNestedVoidWhenComplete)
    bool continuationCalled = false;
 
    // Act
-   Future<void> unwrapped = future.Then([&continuationCalled](auto& f)
+   Future<void> unwrapped = future.Then([&continuationCalled](auto f)
    {
       f.Get();
       continuationCalled = true;

@@ -2,7 +2,7 @@
 gtest/1.7.0@RFerraro/stable
 
 [generators]
-# visual_studio
+cmake
 
 [options]
 gtest:shared=False

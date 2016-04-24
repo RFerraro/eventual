@@ -1,6 +1,6 @@
 #include "stdafx.h"
 #include <thread>
-#include <eventual\eventual.h>
+#include <eventual/eventual.h>
 #include "BasicAllocator.h"
 
 using namespace eventual;
@@ -197,7 +197,7 @@ TEST(PackagedTaskTest, Execute_FullfillsTaskPromise)
 TEST(PackagedTaskTest, Execute_ForwardsTaskExceptions)
 {
    // Arrange
-   Packaged_Task<int(int)> task([](int i) -> int { throw PackagedTaskTestException(); });
+   Packaged_Task<int(int)> task([](int) -> int { throw PackagedTaskTestException(); });
    auto future = task.Get_Future();
 
    // Act
@@ -210,7 +210,7 @@ TEST(PackagedTaskTest, Execute_ForwardsTaskExceptions)
 TEST(PackagedTaskTest, Execute_ForwardsTaskExceptions_FutureError)
 {
    // Arrange
-   Packaged_Task<int(int)> task([](int i) -> int { throw future_error(std::make_error_code(future_errc::no_state)); });
+   Packaged_Task<int(int)> task([](int) -> int { throw future_error(std::make_error_code(future_errc::no_state)); });
    auto future = task.Get_Future();
 
    // Act
@@ -274,7 +274,7 @@ TEST(PackagedTaskTest, MakeReadyAtThreadExitVoid_FullfillsTaskPromise)
 {
    // Arrange
    int expected = 5;
-   Packaged_Task<void(int)> task([](int i) { });
+   Packaged_Task<void(int)> task([](int) { });
    auto future = task.Get_Future();
 
    std::mutex m;
@@ -304,7 +304,7 @@ TEST(PackagedTaskTest, MakeReadyAtThreadExitVoid_FullfillsTaskPromise)
 TEST(PackagedTaskTest, MakeReadyAtThreadExit_ForwardsTaskExceptions)
 {
    // Arrange
-   Packaged_Task<int(int)> task([](int i) -> int { throw PackagedTaskTestException(); });
+   Packaged_Task<int(int)> task([](int) -> int { throw PackagedTaskTestException(); });
    auto future = task.Get_Future();
 
    std::mutex m;
@@ -334,7 +334,7 @@ TEST(PackagedTaskTest, MakeReadyAtThreadExit_ForwardsTaskExceptions)
 TEST(PackagedTaskTest, MakeReadyAtThreadExit_ForwardsTaskExceptions_FutureError)
 {
    // Arrange
-   Packaged_Task<int(int)> task([](int i) -> int { throw future_error(std::make_error_code(future_errc::no_state)); });
+   Packaged_Task<int(int)> task([](int) -> int { throw future_error(std::make_error_code(future_errc::no_state)); });
    auto future = task.Get_Future();
 
    std::mutex m;

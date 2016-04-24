@@ -1,6 +1,6 @@
 #include "stdafx.h"
 #include <exception>
-#include <eventual\eventual.h>
+#include <eventual/eventual.h>
 #include "FutureTestPatterns.h"
 
 using namespace eventual;
@@ -79,7 +79,7 @@ TYPED_TEST(SharedFutureTest, Then_DoesNotInvalidateSharedFuture)
    auto future = MakeCompleteSharedFuture<TypeParam>();
 
    // Act
-   future.Then([](auto& f) { });
+   future.Then([](auto) { });
 
    // Assert
    EXPECT_TRUE(future.Valid()) << "Shared_Future::Then incorrectly invalidated the future.";
@@ -155,7 +155,7 @@ TEST(SharedFutureTest_Value, Then_InvokesContinuationWhenComplete)
    int actual = -1;
 
    // Act
-   future.Then([&actual](auto& f) { actual = f.Get(); });
+   future.Then([&actual](auto f) { actual = f.Get(); });
    promise.Set_Value(expected);
 
    // Assert
@@ -172,7 +172,7 @@ TEST(SharedFutureTest_Reference, Then_InvokesContinuationWhenComplete)
    int* actualAddress = nullptr;
 
    // Act
-   future.Then([&actualAddress](auto& f)
+   future.Then([&actualAddress](auto f)
    {
       auto& temp = f.Get();
       actualAddress = &temp;
@@ -191,7 +191,7 @@ TEST(SharedFutureTest_Void, Then_InvokesContinuationWhenComplete)
    bool continuationCalled = false;
 
    // Act
-   future.Then([&continuationCalled](auto& f)
+   future.Then([&continuationCalled](auto f)
    {
       f.Get();
       continuationCalled = true;
@@ -210,7 +210,7 @@ TEST(SharedFutureTest_Value, Then_UnwrapsAndReturnNestedResultWhenComplete)
    int expected = 13;
 
    // Act
-   auto unwrapped = future.Then([](auto& f)
+   auto unwrapped = future.Then([](auto f)
    {
       Promise<int> inner;
       auto temp = f.Get() + 1;
@@ -233,7 +233,7 @@ TEST(SharedFutureTest_Reference, Then_UnwrapsAndReturnsNestedResultWhenComplete)
    auto expectedAddress = &expected;
 
    // Act
-   auto unwrapped = future.Then([](auto& f)
+   auto unwrapped = future.Then([](auto f)
    {
       Promise<int&> inner;
       auto& temp = f.Get();
@@ -256,7 +256,7 @@ TEST(SharedFutureTest_Void, Then_UnwrapsAndReturnsNestedResultWhenComplete)
    bool continuationCalled = false;
 
    // Act
-   Shared_Future<void> unwrapped = future.Then([&continuationCalled](auto& f)
+   Shared_Future<void> unwrapped = future.Then([&continuationCalled](auto f)
    {
       f.Get();
       continuationCalled = true;

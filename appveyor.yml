@@ -19,16 +19,17 @@ cache:
 #- '%USERPROFILE%\.conan' -> cache.txt
 #- '%USERPROFILE%\Downloads' -> cache.txt
 install:
-- ps: '.\appveyor\install_conan.ps1'
-- ps: '.\appveyor\install_opencppcoverage.ps1'
+- ps: '.\tools\appveyor\install_conan.ps1'
+- ps: '.\tools\appveyor\install_opencppcoverage.ps1'
 before_build:
-- ps: '.\appveyor\install_packages.ps1'
+- ps: '.\tools\appveyor\install_packages.ps1'
+- ps: '.\tools\appveyor\create_solution.ps1'
 build:
-  project: .\msvc\eventual.sln
+  project: .\build\eventual.sln
   verbosity: minimal
 test_script:
-- ps: '.\appveyor\run_tests.ps1'
-- ps: '.\appveyor\post_coverage_results.ps1'
+- ps: '.\tools\appveyor\run_tests.ps1'
+- ps: '.\tools\appveyor\post_coverage_results.ps1'
 
 #on_finish:
 #- ps: $blockRdp = $true; iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
