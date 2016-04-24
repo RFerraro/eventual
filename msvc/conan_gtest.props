@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <_PropertySheetDisplayName>Google Test (Conan @RFerraro/stable)</_PropertySheetDisplayName>
+  </PropertyGroup>
+
+  <PropertyGroup Label="UserMacros" Condition="'$(Configuration)|$(PlatformTarget)'=='Release|x86'">
+    <GTestHash>79c71dbda360a634692376cd2ed5aafa18493952</GTestHash>
+  </PropertyGroup>
+  <PropertyGroup Label="UserMacros" Condition="'$(Configuration)|$(PlatformTarget)'=='Debug|x86'">
+    <GTestHash>d9719aa212abfb01ad27d8207d37440982a68e66</GTestHash>
+  </PropertyGroup>
+  <PropertyGroup Label="UserMacros" Condition="'$(Configuration)|$(PlatformTarget)'=='Release|x64'">
+    <GTestHash>df81ad20137149d7a51276fd3e24009b45e5964a</GTestHash>
+  </PropertyGroup>
+  <PropertyGroup Label="UserMacros" Condition="'$(Configuration)|$(PlatformTarget)'=='Debug|x64'">
+    <GTestHash>f27dcd2d5e453cb01f9324a959461903ce8116a0</GTestHash>
+  </PropertyGroup>
+  
+  <PropertyGroup Label="UserMacros">
+    <ConanDir>$([System.IO.Path]::GetFullPath('$(USERPROFILE)\.conan\data'))</ConanDir>
+    <GTestVersion>1.7.0</GTestVersion>
+    <GTestDir>$([System.IO.Path]::Combine('$(ConanDir)', 'gtest', '$(GTestVersion)', 'RFerraro\stable\package', '$(GTestHash)'))</GTestDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(GTestDir)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <AdditionalLibraryDirectories>$(GTestDir)\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>gtest.lib;gtest_main.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <BuildMacro Include="GTestDir">
+      <Value>$(GTestDir)</Value>
+    </BuildMacro>
+  </ItemGroup>
+</Project>

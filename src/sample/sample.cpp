@@ -183,7 +183,7 @@ void Examples_Make_Exceptional_Future()
    }
 }
 
-int main(int argCount, char* args[])
+int _tmain(int argc, _TCHAR* argv[])
 {
    try
    {
