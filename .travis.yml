@@ -1,0 +1,47 @@
+sudo: false
+language: cpp
+
+matrix:
+   fast-finish: true
+   include:
+      - compiler: clang
+        env: COMPILER=clang COMPILER_CXX=clang++-3.7 COMPILER_CC=clang-3.7
+        addons:
+           apt:
+              sources:
+                 - ubuntu-toolchain-r-test
+                 - llvm-toolchain-precise-3.7
+                 - kalakris-cmake
+              packages:
+                 - clang-3.7
+                 - libstdc++6
+                 - cmake
+      - compiler: gcc
+        env: COMPILER=gcc COMPILER_CXX=g++-5 COMPILER_CC=gcc-5
+        addons:
+           apt:
+              sources:
+                 - ubuntu-toolchain-r-test
+                 - kalakris-cmake
+              packages:
+                 - g++-5
+                 - gcc-5
+                 - cmake
+
+before_install:
+   - export CXX="${COMPILER_CXX}" CC="${COMPILER_CC}"
+  
+install:
+   - pip install --user conan
+   - conan user
+   - conan --version
+   - conan install . -s compiler=$COMPILER -s compiler.libcxx='libstdc++11' --build gtest
+   
+before_script:
+   - mkdir build
+   - cd build
+
+script: 
+   - cmake .. 
+   - cmake --build .
+   - ./test/bin/Test
