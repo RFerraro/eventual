@@ -426,12 +426,6 @@ namespace eventual
          {
             auto lock = AquireLock();
 
-            if (Is_Ready())
-            {
-               CheckException();
-               return std::move(_result);
-            }
-
             Wait(lock);
             CheckException();
             return std::move(_result);
@@ -519,12 +513,6 @@ namespace eventual
          { 
             auto lock = AquireLock();
 
-            if (Is_Ready())
-            {
-               CheckException();
-               return *_result;
-            }
-
             Wait(lock);
             CheckException();
             return *_result; 
@@ -580,9 +568,6 @@ namespace eventual
          void GetResult()
          {
             auto lock = AquireLock();
-
-            if (Is_Ready())
-               CheckException();
 
             Wait(lock);
             CheckException();
@@ -851,14 +836,14 @@ namespace eventual
          std::function<R(ArgTypes...)> _task;
       };
 
-      template<class R, class TFuture>
+      template<class R>
       class BasicFuture
       {
          using State = detail::State<R>;
          using SharedState = std::shared_ptr<State>;
          using unique_lock = std::unique_lock<std::mutex>;
 
-         template<class, class>
+         template<class>
          friend class BasicFuture;
          friend class FutureHelper;
 
@@ -897,27 +882,38 @@ namespace eventual
             return state->Wait_Until(abs_time) ? future_status::ready : future_status::timeout;
          }
 
-         decltype(auto) Get()
-         {
-            return GetResult(*this);
-         }
-
-         //todo: clean up this cast (move up a level...)
-         template<class F>
-         decltype(auto) Then(F&& continuation)
-         {
-            return ThenImpl(detail::decay_copy(std::forward<F>(continuation)), std::move(*static_cast<TFuture*>(this)));
-         }
-
       protected:
 
-         template<template<typename> class Future>
-         BasicFuture(BasicFuture<R, Future<R>>&& other)
-            : BasicFuture(other._state)
-         { }
+         template<class T>
+         static decltype(auto) GetResult(BasicFuture<T>& future)
+         {
+             auto state = future.ValidateState();
+             future.ResetState();
+             return state->GetResult();
+         }
 
-         template<class Future, template<typename> class NestedFuture>
-         BasicFuture(BasicFuture<NestedFuture<R>, Future>&& other)
+         template<class T>
+         static decltype(auto) GetSharedResult(BasicFuture<T>& future)
+         {
+             auto state = future.ValidateState();
+             return state->GetResult();
+         }
+
+         static void GetResult(BasicFuture<void>& future)
+         {
+             auto state = future.ValidateState();
+             future.ResetState();
+             state->GetResult();
+         }
+
+         static void GetSharedResult(BasicFuture<void>& future)
+         {
+             auto state = future.ValidateState();
+             state->GetResult();
+         }
+
+         template<template<typename> class NestedFuture>
+         BasicFuture(BasicFuture<NestedFuture<R>>&& other)
             : BasicFuture(SharedState(new State()))
          {
             auto outerState = std::move(other._state);
@@ -953,62 +949,33 @@ namespace eventual
             return state;
          }
 
-         /*template<class F>
-         decltype(auto) ThenForward(F&& continuation)
-         {
-            return ThenImpl(std::forward<F>(continuation));
-         }*/
-
-      private:
-
          //todo: SFINAE way to prevent [](Future&){...} continuations (clang doesn't like them...)
-         template<class F, class TF>
-         decltype(auto) ThenImpl(F&& continuation, TF&& future)
+         template<class TContinuation, class TFuture>
+         static decltype(auto) ThenImpl(TContinuation&& continuation, TFuture&& future)
          {
             using namespace std;
             
-            using result_t = result_of_t<F(TFuture)>;
+            using result_t = result_of_t<TContinuation(TFuture)>;
 
-            auto state = future.ValidateState();
+            auto current = forward<TFuture>(future);
+            auto state = current.ValidateState();
 
-            BasicTask<result_t, TFuture> task(forward<F>(continuation));
-
+            BasicTask<result_t, TFuture> task(forward<TContinuation>(continuation));
             auto taskFuture = Unwrap(task.Get_Future());
-            auto future2 = CreateInternalFuture(state);
 
             state->SetCallback(
                [
                   task = move(task),
-                  future2 = move(future2)
+                  current = move(current)
                ]() mutable
             {
-               task(move(future2));
+               task(move(current));
             });
 
             return taskFuture;
          }
 
-         static void TransferState(BasicFuture<R, Shared_Future<R>>& future, SharedState& state)
-         {
-            future._state = state;
-         }
-
-         static void TransferState(BasicFuture<R, Future<R>>& future, SharedState& state)
-         {
-            future._state = std::move(state);
-         }
-
-         TFuture CreateInternalFuture(SharedState state)
-         {
-            TFuture future;
-            TransferState(future, state);
-
-            // state was "moved"
-            if (!state)
-               _state.reset();
-
-            return future;
-         }
+         private:
 
          template<typename T, template<typename> class TOuter, template<typename> class TInner>
          static enable_if_future_t<TInner<T>> Unwrap(TOuter<TInner<T>>&& future)
@@ -1022,32 +989,9 @@ namespace eventual
             return std::forward<TOuter<T>>(future);
          }
 
-         template<class T>
-         static decltype(auto) GetResult(BasicFuture<T, Future<T>>& future)
+         void ResetState()
          {
-            auto state = future.ValidateState();
-            future._state.reset();
-            return state->GetResult();
-         }
-
-         template<class T>
-         static decltype(auto) GetResult(BasicFuture<T, Shared_Future<T>>& future)
-         {
-            auto state = future.ValidateState();
-            return state->GetResult();
-         }
-
-         static void GetResult(BasicFuture<void, Future<void>>& future)
-         {
-            auto state = future.ValidateState();
-            future._state.reset();
-            state->GetResult();
-         }
-
-         static void GetResult(BasicFuture<void, Shared_Future<void>>& future)
-         {
-            auto state = future.ValidateState();
-            state->GetResult();
+             _state.reset();
          }
 
          SharedState _state;
@@ -1062,9 +1006,9 @@ namespace eventual
    };
 
    template<class RType>
-   class Future : public detail::BasicFuture<RType, Future<RType>>
+   class Future : public detail::BasicFuture<RType>
    {
-      using Base = detail::BasicFuture<RType, Future<RType>>;
+      using Base = detail::BasicFuture<RType>;
       friend class detail::FutureHelper;
 
    public:
@@ -1075,12 +1019,23 @@ namespace eventual
 
       Future& operator=(const Future& other) = delete;
       Future& operator=(Future&& other) noexcept = default;
+
+      template<class F>
+      decltype(auto) Then(F&& continuation)
+      {
+          return Base::ThenImpl(detail::decay_copy(std::forward<F>(continuation)), std::move(*this));
+      }
+
+      decltype(auto) Get()
+      {
+          return Base::GetResult(*this);
+      }
    };
 
    template<class RType>
-   class Future<RType&> : public detail::BasicFuture<RType&, Future<RType&>>
+   class Future<RType&> : public detail::BasicFuture<RType&>
    {
-      using Base = detail::BasicFuture<RType&, Future<RType&>>;
+      using Base = detail::BasicFuture<RType&>;
       friend class detail::FutureHelper;
       
    public:
@@ -1091,12 +1046,23 @@ namespace eventual
 
       Future& operator=(const Future& other) = delete;
       Future& operator=(Future&& other) noexcept = default;
+
+      template<class F>
+      decltype(auto) Then(F&& continuation)
+      {
+          return Base::ThenImpl(detail::decay_copy(std::forward<F>(continuation)), std::move(*this));
+      }
+
+      decltype(auto) Get()
+      {
+          return Base::GetResult(*this);
+      }
    };
 
    template<>
-   class Future<void> : public detail::BasicFuture<void, Future<void>>
+   class Future<void> : public detail::BasicFuture<void>
    {
-      using Base = detail::BasicFuture<void, Future>;
+      using Base = detail::BasicFuture<void>;
       friend class detail::FutureHelper;
       
    public:
@@ -1107,6 +1073,17 @@ namespace eventual
 
       Future& operator=(const Future& other) = delete;
       Future& operator=(Future&& other) noexcept = default;
+
+      template<class F>
+      decltype(auto) Then(F&& continuation)
+      {
+          return Base::ThenImpl(detail::decay_copy(std::forward<F>(continuation)), std::move(*this));
+      }
+
+      decltype(auto) Get()
+      {
+          return Base::GetResult(*this);
+      }
    };
 
    template<class R>
@@ -1197,9 +1174,9 @@ namespace eventual
    };
 
    template<class R> 
-   class Shared_Future : public detail::BasicFuture<R, Shared_Future<R>>
+   class Shared_Future : public detail::BasicFuture<R>
    {
-      using Base = detail::BasicFuture<R, Shared_Future<R>>;
+      using Base = detail::BasicFuture<R>;
       friend class detail::FutureHelper;
 
    public:
@@ -1214,12 +1191,23 @@ namespace eventual
       Shared_Future& operator=(Shared_Future&& other) noexcept = default;
 
       Shared_Future Share() = delete;
+
+      template<class F>
+      decltype(auto) Then(F&& continuation)
+      {
+          return Base::ThenImpl(detail::decay_copy(std::forward<F>(continuation)), Shared_Future(*this));
+      }
+
+      decltype(auto) Get()
+      {
+          return Base::GetSharedResult(*this);
+      }
    };
 
    template<class R> 
-   class Shared_Future<R&> : public detail::BasicFuture<R&, Shared_Future<R&>>
+   class Shared_Future<R&> : public detail::BasicFuture<R&>
    {
-      using Base = detail::BasicFuture<R&, Shared_Future<R&>>;
+      using Base = detail::BasicFuture<R&>;
       friend class detail::FutureHelper;
 
    public:
@@ -1234,12 +1222,23 @@ namespace eventual
       Shared_Future& operator=(Shared_Future&& other) noexcept = default;
 
       Shared_Future Share() = delete;
+
+      template<class F>
+      decltype(auto) Then(F&& continuation)
+      {
+          return Base::ThenImpl(detail::decay_copy(std::forward<F>(continuation)), Shared_Future(*this));
+      }
+
+      decltype(auto) Get()
+      {
+          return Base::GetSharedResult(*this);
+      }
    };
 
    template<>
-   class Shared_Future<void> : public detail::BasicFuture<void, Shared_Future<void>>
+   class Shared_Future<void> : public detail::BasicFuture<void>
    {
-      using Base = detail::BasicFuture<void, Shared_Future<void>>;
+      using Base = detail::BasicFuture<void>;
       friend class detail::FutureHelper;
 
    public:
@@ -1255,6 +1254,17 @@ namespace eventual
       Shared_Future& operator=(Shared_Future&& other) noexcept = default;
 
       Shared_Future Share() = delete;
+
+      template<class F>
+      decltype(auto) Then(F&& continuation)
+      {
+          return Base::ThenImpl(detail::decay_copy(std::forward<F>(continuation)), Shared_Future(*this));
+      }
+
+      decltype(auto) Get()
+      {
+          return Base::GetSharedResult(*this);
+      }
    };
 
    template<class R, class... ArgTypes>
@@ -1434,8 +1444,8 @@ namespace eventual
          return FutureHelper::CreateFuture<Future<R>>(std::forward<SharedState>(state));
       }
 
-      template<class R, class TFuture>
-      Shared_Future<R> BasicFuture<R, TFuture>::Share()
+      template<class R>
+      Shared_Future<R> BasicFuture<R>::Share()
       {
          auto state = ValidateState();
          _state.reset();

@@ -43,6 +43,9 @@ list(APPEND TEST_SOURCES SharedFutureTests.cpp)
 list(APPEND TEST_SOURCES test.cpp)
 
 if(MSVC)
+   
+   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /Yu\"stdafx.h\"")
+
    set_source_files_properties(stdafx.cpp
       PROPERTIES COMPILE_FLAGS "/Ycstdafx.h")
       
@@ -61,6 +64,7 @@ list(APPEND TEST_SOURCES stdafx.h)
 list(APPEND TEST_SOURCES BasicAllocator.h)
 list(APPEND TEST_SOURCES FutureTestPatterns.h)
 list(APPEND TEST_SOURCES NonCopyable.h)
+list(APPEND TEST_SOURCES "../include/eventual/eventual.h")
 
 add_executable(Test ${TEST_SOURCES})
 

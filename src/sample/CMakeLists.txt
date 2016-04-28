@@ -8,8 +8,12 @@ project(sample)
 
 list(APPEND SOURCES sample.cpp)
 list(APPEND SOURCES stdafx.h)
+list(APPEND SOURCES "../../include/eventual/eventual.h")
 
 if(MSVC)
+
+   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /Yu\"stdafx.h\"")
+
    set_source_files_properties(stdafx.cpp PROPERTIES COMPILE_FLAGS "/Ycstdafx.h")
    set_source_files_properties(sample.cpp PROPERTIES COMPILE_FLAGS "/Yustdafx.h")
 endif()
