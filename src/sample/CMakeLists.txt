@@ -9,6 +9,9 @@ project(sample)
 list(APPEND SOURCES sample.cpp)
 list(APPEND SOURCES stdafx.h)
 list(APPEND SOURCES "../../include/eventual/eventual.h")
+list(APPEND SOURCES "../../include/eventual/detail/implementation.h")
+list(APPEND SOURCES "../../include/eventual/detail/traits.h")
+list(APPEND SOURCES "../../include/eventual/detail/utility.h")
 
 if(MSVC)
 

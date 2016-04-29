@@ -65,6 +65,9 @@ list(APPEND TEST_SOURCES BasicAllocator.h)
 list(APPEND TEST_SOURCES FutureTestPatterns.h)
 list(APPEND TEST_SOURCES NonCopyable.h)
 list(APPEND TEST_SOURCES "../include/eventual/eventual.h")
+list(APPEND TEST_SOURCES "../include/eventual/detail/implementation.h")
+list(APPEND TEST_SOURCES "../include/eventual/detail/traits.h")
+list(APPEND TEST_SOURCES "../include/eventual/detail/utility.h")
 
 add_executable(Test ${TEST_SOURCES})
 
