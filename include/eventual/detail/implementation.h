@@ -110,14 +110,14 @@ namespace eventual
         }
 
         template<class Allocator, class F, class R, class... Args>
-        std::enable_if_t<std::is_constructible<std::function<R(Args...)>, Allocator, F>::value, std::function<R(Args...)>>
+        std::enable_if_t<std::is_constructible<std::function<R(Args...)>, std::allocator_arg_t, Allocator, F>::value, std::function<R(Args...)>>
             CreateSharedFunction(const Allocator& alloc, F&& function)
         {
             return std::function<R(Args...)>(std::allocator_arg_t(), alloc, AllocateSharedFunction(alloc, std::forward<F>(function)));
         }
 
         template<class Allocator, class F, class R, class... Args>
-        std::enable_if_t<!std::is_constructible<std::function<R(Args...)>, Allocator, F>::value, std::function<R(Args...)>>
+        std::enable_if_t<!std::is_constructible<std::function<R(Args...)>, std::allocator_arg_t, Allocator, F>::value, std::function<R(Args...)>>
             CreateSharedFunction(const Allocator& alloc, F&& function)
         {
             // because libstdc++...
