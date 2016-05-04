@@ -52,7 +52,6 @@ void Sample_BasicContinuation()
    });
    // ... do other stuff
    promise.Set_Value(refValue);
-
 }
 
 void Chaining_Continuations()

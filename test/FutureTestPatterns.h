@@ -472,7 +472,7 @@ TYPED_TEST_P(FutureTestPatterns, Then_ReturnsFutureWithNestedFuturesExceptionWhe
    EXPECT_THROW(unwrapped.Get(), FutureTestException) << "Future::Then failed to unwrap a nested future and return its exception.";
 }
 
-TYPED_TEST_P(FutureTestPatterns, Then_ReturnsFutureWithNoStateExceptionWhenInnerFutureHasNoState)
+TYPED_TEST_P(FutureTestPatterns, Then_ReturnsFutureWithBrokenPromiseExceptionWhenInnerFutureHasNoState)
 {
    using namespace eventual;
    
@@ -500,7 +500,7 @@ TYPED_TEST_P(FutureTestPatterns, Then_ReturnsFutureWithNoStateExceptionWhenInner
    catch (const future_error& e)
    {
       
-      EXPECT_EQ(future_errc::no_state, e.code()) << "Future::Then failed to unwrap a nested future and return a no-state exception.";
+      EXPECT_EQ(future_errc::broken_promise, e.code()) << "Future::Then failed to unwrap a nested future and return a broken-promise exception.";
    }
 }
 
@@ -530,4 +530,4 @@ REGISTER_TYPED_TEST_CASE_P(FutureTestPatterns,
                            Then_ReturnsFutureWithCapturedExceptionOfContinuation,
                            Then_ReturnsFutureWithCompletedNestedFuturesException,
                            Then_ReturnsFutureWithNestedFuturesExceptionWhenComplete,
-                           Then_ReturnsFutureWithNoStateExceptionWhenInnerFutureHasNoState);
+                           Then_ReturnsFutureWithBrokenPromiseExceptionWhenInnerFutureHasNoState);

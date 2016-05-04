@@ -45,7 +45,7 @@ TYPED_TEST(PromiseTest, CustomAllocatorConstructorCreatesValidState)
    
    // Assert
    EXPECT_NO_THROW(promise.Get_Future()) << "Promise CTor did not create a valid state.";
-   EXPECT_EQ(1, alloc.GetCount()) << "Custom allocator did not detect any heap creation.";
+   EXPECT_GT(alloc.GetCount(), 0) << "Custom allocator did not detect any heap creation.";
 }
 
 TYPED_TEST(PromiseTest, IsMoveConstructable)
@@ -355,6 +355,18 @@ TEST(PromiseTest_Value, SetValue_ThrowsIfMovedValueIntoStateMultipleTimes)
 
    // Act/Assert
    EXPECT_THROW(promise.Set_Value(NonCopyable()), future_error) << "SetValue allowed changing the value after being set.";
+}
+
+TEST(PromiseTest_ConstValue, SetValue_ThrowsIfSetMultipleTimes)
+{
+    // Arrange
+    const int value = 13;
+
+    Promise<int> promise;
+    promise.Set_Value(value);
+
+    // Act/Assert
+    EXPECT_THROW(promise.Set_Value(value), future_error) << "SetValue allowed changing the value after being set.";
 }
 
 TEST(PromiseTest_Value, SetValue_MoveValueThrowsIfStateIsInvalid)
@@ -823,4 +835,19 @@ TEST(PromiseTest_Void, SetValueAtThreadExit_ThrowsIfStateIsInvalid)
 
    // Assert
    EXPECT_TRUE(result.load()) << "Set_Value did not throw an error when setting a value to an invalid promise.";
+}
+
+TEST(PromiseTest, CanCreateDeeplyNestedFutures)
+{
+    // Edge case test
+
+    // Arrange
+    Promise<Future<Future<Future<int>>>> promise;
+
+    // Act
+    auto future = promise.Get_Future();
+    future.Then([](auto) { });
+
+    // Assert
+    SUCCEED();
 }

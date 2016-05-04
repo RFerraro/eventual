@@ -29,12 +29,18 @@
 #include <exception>
 #include <utility>
 #include <tuple>
-#include <stack>
+#include <queue>
 #include <mutex>
 #include <chrono>
+#include <cassert>
+#include <memory>
+#include <cstddef>
+
+#include <list>
 
 #include "traits.h"
 #include "utility.h"
+#include "allocation.h"
 
 namespace eventual
 {
@@ -44,11 +50,15 @@ namespace eventual
     template<class Sequence>
     struct When_Any_Result;
 
-    inline Future<void> Make_Ready_Future();
-
     namespace detail
     {
-        class FutureHelper;
+        template<class Future, class... Futures>
+        static decltype(auto) When_All_(Future&& head, Futures&&... others);
+
+        static Future<std::tuple<>> When_All_();
+
+        template <class R> class BasicPromise;
+        template <class R> class BasicFuture;
 
         // Aliases
 
@@ -68,83 +78,322 @@ namespace eventual
         template<class... Futures>
         using any_futures_result_tuple = Future<When_Any_Result<std::tuple<std::decay_t<Futures>...>>>;
 
-        template<class F>
-        class SharedFunction
+        class SimpleDelegate
         {
-        public:
-            SharedFunction() = default;
-            SharedFunction(F&& function)
-                : _function(std::make_shared<F>(std::forward<F>(function)))
-            { }
-
-            template<class Allocator>
-            SharedFunction(const Allocator& alloc, F&& function)
-                : _function(std::allocate_shared<F>(alloc, std::forward<F>(function)))
-            { }
-
-            SharedFunction(const SharedFunction&) = default;
-            SharedFunction(SharedFunction&&) = default;
-            SharedFunction& operator=(const SharedFunction&) = default;
-            SharedFunction& operator=(SharedFunction&&) = default;
-
-            template<class... Args>
-            decltype(auto) operator()(Args&&... args) const
+            class Delegate
             {
-                return (*_function)(std::forward<Args>(args)...);
+            public:
+                virtual ~Delegate() { }
+                virtual void operator()() = 0;
+            };
+
+            template<class T>
+            class SmallDelegate : public Delegate
+            {
+            public:
+
+                SmallDelegate(T&& callable)
+                    : _callable(std::forward<T>(callable))
+                { }
+
+                virtual void operator()() override
+                {
+                    _callable();
+                }
+
+            private:
+                T _callable;
+            };
+
+            template<class T>
+            class LargeDelegate : public Delegate
+            {
+            public:
+
+                LargeDelegate(T&& callable, polymorphic_allocator<T>&& allocator)
+                    : _callable(Create(std::forward<T>(callable), allocator))
+                { }
+
+                virtual void operator()() override
+                {
+                    (*_callable)();
+                }
+
+            private:
+
+                struct Deleter
+                {
+                    Deleter(const polymorphic_allocator<T>& resource)
+                        : _resource(resource)
+                    {
+                    }
+
+                    void operator()(T* functor)
+                    {
+                        using traits = std::allocator_traits<polymorphic_allocator<T>>;
+
+                        traits::destroy(_resource, functor);
+                        traits::deallocate(_resource, functor, 1);
+                    }
+
+                    polymorphic_allocator<T> _resource;
+                };
+
+                std::unique_ptr<T, Deleter> Create(T&& callable, polymorphic_allocator<T>& resource)
+                {
+                    using traits = std::allocator_traits<polymorphic_allocator<T>>;
+
+                    auto ptr = traits::allocate(resource, 1);
+                    traits::construct(resource, ptr, std::forward<T>(callable));
+
+                    return std::unique_ptr<T, Deleter>(ptr, Deleter(resource));
+                }
+
+                std::unique_ptr<T, Deleter> _callable;
+            };
+
+            // dummy type
+            struct Callable
+            {
+                void operator()() { }
+            };
+            
+            //todo: fine-tune this size
+            using storage_t = std::aligned_union_t<32, SmallDelegate<Callable>, LargeDelegate<Callable>>;
+
+            struct PlacementDestructor
+            {
+                void operator()(Delegate* obj) const
+                {
+                    obj->~Delegate();
+                }
+            };
+
+            using object_pointer = std::unique_ptr<Delegate, PlacementDestructor>;
+
+        public:
+
+            template<class T, class = typename enable_if_not_same<SimpleDelegate, T>::type>
+            SimpleDelegate(T&& functor, const polymorphic_allocator<SimpleDelegate>& alloc)
+                : _data(),
+                  _object(Create(std::forward<T>(functor), alloc))
+            { }
+
+            // only contructable in-place. No move/copy.
+            SimpleDelegate(SimpleDelegate&&) = delete;
+            SimpleDelegate& operator=(const SimpleDelegate&) = delete;
+            SimpleDelegate(const SimpleDelegate&) = delete;
+            SimpleDelegate& operator=(SimpleDelegate&&) = default;
+
+            void operator()() const
+            {
+                // this internal object should never be null
+                assert(_object);
+
+                _object->operator()();
             }
 
         private:
-            std::shared_ptr<F> _function;
+
+            template<class T>
+            enable_if_size_is_less_than_or_eq_t<SmallDelegate<T>, storage_t, object_pointer>
+            Create(T&& functor, const polymorphic_allocator<SimpleDelegate>)
+            {
+                static_assert(sizeof(SmallDelegate<T>) <= sizeof(storage_t), "Delegate does not fit in storage buffer.");
+
+                return object_pointer(new(&_data) SmallDelegate<T>(std::forward<T>(functor)));
+            }
+
+            template<class T>
+            enable_if_size_is_greater_than_t<SmallDelegate<T>, storage_t, object_pointer>
+            Create(T&& functor, const polymorphic_allocator<SimpleDelegate>& alloc)
+            {
+                static_assert(sizeof(SmallDelegate<T>) > sizeof(storage_t), "Incorrect delegate choosen.");
+                static_assert(sizeof(LargeDelegate<T>) <= sizeof(storage_t), "Pointer delegate does not fit in storage buffer.");
+
+                return object_pointer(new(&_data) LargeDelegate<T>(std::forward<T>(functor), polymorphic_allocator<T>(alloc)));
+            }
+            
+            storage_t _data;
+            object_pointer _object;
         };
 
-        template<class F>
-        auto MakeSharedFunction(F&& function)
+        class FutureHelper
         {
-            return SharedFunction<std::decay_t<F>>(std::move(function));
-        }
+        public:
 
-        template<class Allocator, class F>
-        auto AllocateSharedFunction(const Allocator& alloc, F&& function)
-        {
-            return SharedFunction<std::decay_t<F>>(alloc, std::move(function));
-        }
+            template<class TUnit>
+            static decltype(auto) Get_Future(const BasicPromise<TUnit>& promise);
 
-        template<class Allocator, class F, class R, class... Args>
-        std::enable_if_t<std::is_constructible<std::function<R(Args...)>, std::allocator_arg_t, Allocator, F>::value, std::function<R(Args...)>>
-            CreateSharedFunction(const Allocator& alloc, F&& function)
-        {
-            return std::function<R(Args...)>(std::allocator_arg_t(), alloc, AllocateSharedFunction(alloc, std::forward<F>(function)));
-        }
+            template<class TFuture, class T>
+            static void SetCallback(TFuture& future, T&& callback)
+            {
+                future._state->SetCallback(std::forward<T>(callback));
+            }
 
-        template<class Allocator, class F, class R, class... Args>
-        std::enable_if_t<!std::is_constructible<std::function<R(Args...)>, std::allocator_arg_t, Allocator, F>::value, std::function<R(Args...)>>
-            CreateSharedFunction(const Allocator& alloc, F&& function)
-        {
-            // because libstdc++...
-            return std::function<R(Args...)>(AllocateSharedFunction(alloc, std::forward<F>(function)));
-        }
+            template<class TPromise, class T>
+            static bool TrySetValue(TPromise& promise, const T& value)
+            {
+                return promise.TrySetValue(value);
+            }
 
-        class BasicState
+            template<class TState, class T>
+            static void SetResultFromFuture(TState& state, BasicFuture<T>& future);
+        };
+
+        template<typename T>
+        class ResultBlock
         {
-        protected:
+        public:
+
+            ResultBlock()
+                : _result(nullptr) { }
+
+            ResultBlock(ResultBlock&&) = delete;
+            ResultBlock(const ResultBlock&) = delete;
+            ResultBlock& operator=(ResultBlock&&) = delete;
+            ResultBlock& operator=(const ResultBlock&) = delete;
+
+            ~ResultBlock()
+            { 
+                // placement destruct
+                if (_result)
+                    _result->~T();
+            }
+
+            template<typename R>
+            void Set(R&& result)
+            {
+                assert(_result == nullptr);
+                // placement new
+                _result = new(&_data) T(std::forward<R>(result));
+            }
+
+            T Get()
+            {
+                assert(_result != nullptr);
+                return std::move(*_result);
+            }
+
+            const T& Get() const
+            {
+                assert(_result != nullptr);
+                return *_result;
+            }
+
+        private:
+            std::aligned_storage_t<sizeof(T), alignof(T)> _data;
+            T* _result;
+        };
+
+        struct Tag { explicit Tag(int) { } };
+
+        template<typename T>
+        class State
+        {
+
+        private:
+
             using unique_lock = std::unique_lock<std::mutex>;
+            using strong_reference = std::shared_ptr<State>;
+            using weak_reference = std::weak_ptr<State>;
+            using allocator_t = strong_polymorphic_allocator<State>;
+            using delegate_allocator_t = strong_polymorphic_allocator<SimpleDelegate>;
+            using callbacks_t = std::list<SimpleDelegate, delegate_allocator_t>;
 
         public:
-            BasicState() :
+
+            template<class Alloc>
+            State(const Tag&, const Alloc& alloc) :
                 _retrieved(false),
                 _hasResult(false),
+                _result(),
                 _exception(nullptr),
-                _block(std::make_shared<NotifierBlock>())
+                _self(),
+                _ready(0),
+                _mutex(),
+                _condition(),
+                _allocator(allocator_t(alloc)),
+                _callbacks(delegate_allocator_t(_allocator))
             { }
+            
+            static std::shared_ptr<State> MakeState()
+            {
+                return AllocState(std::allocator<State>());
+            }
 
-            BasicState(BasicState&&) = delete;
-            BasicState(const BasicState&) = delete;
-            BasicState& operator=(BasicState&&) = delete;
-            BasicState& operator=(const BasicState&) = delete;
+            template<class Alloc, class = typename enable_if_not_same<State, Alloc>::type>
+            static std::shared_ptr<State> AllocState(const Alloc& alloc)
+            {
+                auto state = std::allocate_shared<State>(alloc, Tag(0), alloc);
+
+                state->SetNotifier(state);
+
+                return state;
+            }
+
+            State(State&&) = delete;
+            State(const State&) = delete;
+            State& operator=(State&&) = delete;
+            State& operator=(const State&) = delete;
+
+            allocator_t Get_Allocator() const
+            {
+                return _allocator;
+            }
+
+            bool Is_Ready() const { return _ready != 0; }
+
+            void Wait() const
+            {
+                auto lock = AquireLock();
+                Wait(lock);
+            }
+
+            template <class TDuration>
+            bool Wait_For(const TDuration& rel_time)
+            {
+                auto lock = AquireLock();
+                return _condition.wait_for(lock, rel_time, [this]() { return Is_Ready(); });
+            }
+
+            template <class TTime>
+            bool Wait_Until(const TTime& abs_time)
+            {
+                auto lock = AquireLock();
+                return _condition.wait_until(lock, abs_time, [this]() { return Is_Ready(); });
+            }
+
+            template<class TCallback>
+            void SetCallback(TCallback&& callback)
+            {
+                {
+                    auto lock = AquireLock();
+
+                    if (!Is_Ready())
+                    {
+                        _callbacks.emplace_back(std::forward<TCallback>(callback), _callbacks.get_allocator());
+                        return;
+                    }
+                }
+
+                //promise is ready, invoke immediately
+                callback();
+            }
+
+            void NotifyCompletion()
+            {
+                {
+                    auto lock = AquireLock();
+                    _ready = true;
+                    _condition.notify_all();
+                }
+
+                InvokeContinuations();
+            }
 
             bool HasException() { return _exception ? true : false; }
             std::exception_ptr GetException() { return _exception; }
-            bool Is_Ready() { return _block->Is_Ready(); }
             bool HasResult() { return _hasResult; }
 
             // future retrieved
@@ -156,20 +405,6 @@ namespace eventual
 
                 _retrieved = true;
                 return _retrieved;
-            }
-
-            template<class T>
-            void SetCallback(T&& callback)
-            {
-                auto lock = AquireLock();
-                _block->_callbacks.emplace_back(MakeSharedFunction(std::forward<T>(callback)));
-
-                auto cb = _block->_callbacks.back();
-                if (Is_Ready())
-                {
-                    lock.unlock();
-                    cb();
-                }
             }
 
             bool SetException(std::exception_ptr ex)
@@ -190,44 +425,99 @@ namespace eventual
                 return true;
             }
 
-            void Wait()
+            T GetResult()
             {
                 auto lock = AquireLock();
+
                 Wait(lock);
+                CheckException();
+                return _result.Get();
             }
 
-            template <class TDuration>
-            bool Wait_For(const TDuration& rel_time)
+            const T& GetResult() const
             {
                 auto lock = AquireLock();
-                return _block->_condition.wait_for(lock, rel_time, [block = _block]() { return block->Is_Ready(); });
+
+                Wait(lock);
+                CheckException();
+                return _result.Get();
             }
 
-            template <class TTime>
-            bool Wait_Until(const TTime& abs_time)
+            template<class TValue>
+            bool SetResult(TValue&& value)
             {
-                auto lock = AquireLock();
-                return _block->_condition.wait_until(lock, abs_time, [block = _block]() { return block->Is_Ready(); });
+                {
+                    auto lock = AquireLock();
+                    
+                    if (!SetHasResult())
+                        return false;
+
+                    _result.Set(std::forward<TValue>(value));
+                }
+
+                NotifyPromiseFullfilled();
+                return true;
+            }
+
+            template<class TValue>
+            bool SetResultAtThreadExit(TValue&& value)
+            {
+                {
+                    auto lock = AquireLock();
+                    
+                    if (!SetHasResult())
+                        return false;
+
+                    _result.Set(std::forward<TValue>(value));
+                }
+
+                NotifyPromiseFullfilledAtThreadExit();
+                return true;
             }
 
         protected:
 
+            strong_reference GetNotifier()
+            {
+                return _self.lock();
+            }
+
+            void SetNotifier(const weak_reference& notifier)
+            {
+                _self = notifier;
+            }
+
+            unique_lock AquireLock() const
+            {
+                return unique_lock(_mutex);
+            }
+
+            void InvokeContinuations()
+            {
+                for (auto& cb : _callbacks)
+                    cb(); // todo: exceptions?
+            }
+
+            void Wait(unique_lock& lock) const
+            {
+                _condition.wait(lock, [this]() { return Is_Ready(); });
+            }
+
+        private:
+
             void NotifyPromiseFullfilled()
             {
-                _block->InvokeContinuations();
+                NotifyCompletion();
             }
 
             void NotifyPromiseFullfilledAtThreadExit()
             {
-                auto block = _block;
+                auto block = _self.lock();
+                assert(block);
 
                 using namespace std;
                 class ExitNotifier
                 {
-                private:
-                    using callback_t = std::function<void()>;
-
-                    stack<callback_t> _exitFunctions;
                 public:
                     ExitNotifier() = default;
                     ExitNotifier(const ExitNotifier&) = delete;
@@ -237,36 +527,22 @@ namespace eventual
                     {
                         while (!_exitFunctions.empty())
                         {
-                            _exitFunctions.top()();
+                            _exitFunctions.front()->NotifyCompletion();
                             _exitFunctions.pop();
                         }
                     }
 
-                    void Add(callback_t&& callback)
+                    void Add(strong_reference&& block)
                     {
-                        _exitFunctions.push(forward<callback_t>(callback));
+                        _exitFunctions.emplace(forward<strong_reference>(block));
                     }
+
+                private:
+                    queue<strong_reference> _exitFunctions;
                 };
 
                 thread_local ExitNotifier notifier;
-                notifier.Add([block]() { block->InvokeContinuations(); });
-            }
-
-            // lock before calling
-            void SetResult(const BasicState& other)
-            {
-                _hasResult = other._hasResult;
-                _exception = other._exception;
-            }
-
-            void Wait(unique_lock& lock)
-            {
-                _block->_condition.wait(lock, [block = _block]() { return block->Is_Ready(); });
-            }
-
-            unique_lock AquireLock()
-            {
-                return _block->AquireLock();
+                notifier.Add(move(block));
             }
 
             bool SetHasResult()
@@ -278,41 +554,11 @@ namespace eventual
                 return _hasResult;
             }
 
-            void CheckException()
+            void CheckException() const
             {
                 if (_exception)
                     std::rethrow_exception(_exception);
             }
-
-        private:
-
-            struct NotifierBlock
-            {
-                NotifierBlock()
-                    : _ready(0), _mutex(), _condition(), _callbacks()
-                { }
-
-                unique_lock AquireLock() { return unique_lock(_mutex); }
-
-                void InvokeContinuations()
-                {
-                    {
-                        auto lock = AquireLock();
-                        _ready = true;
-                        _condition.notify_all();
-                    }
-
-                    for (auto& cb : _callbacks)
-                        cb(); // todo: exceptions?
-                }
-
-                bool Is_Ready() { return _ready != 0; }
-
-                int _ready;
-                std::mutex _mutex;
-                std::condition_variable _condition;
-                std::vector<std::function<void()>> _callbacks;
-            };
 
             bool SetExceptionImpl(std::exception_ptr ex)
             {
@@ -326,213 +572,128 @@ namespace eventual
 
             bool _retrieved;
             bool _hasResult;
+            ResultBlock<T> _result;
             std::exception_ptr _exception;
-            std::shared_ptr<NotifierBlock> _block;
+            weak_reference _self;
+
+            int _ready;
+            mutable std::mutex _mutex;
+            mutable std::condition_variable _condition;
+            allocator_t _allocator;
+            callbacks_t _callbacks;
         };
 
-        template<typename R>
-        class State : public BasicState
+        template<typename TPrimaryState, typename TSecondaryState>
+        class CompositeState : public TPrimaryState, public TSecondaryState
         {
         public:
 
-            void SetResult(State& other)
+            template<class Alloc>
+            CompositeState(const typename Tag& tag, const Alloc& alloc)
+                : TPrimaryState(tag, alloc), TSecondaryState(tag, alloc)
             {
+                TPrimaryState::SetCallback([this]() mutable
                 {
-                    auto lock = AquireLock();
-                    _result = std::move(other._result);
-                    BasicState::SetResult(other);
-                }
-                NotifyPromiseFullfilled();
+                    if (TPrimaryState::HasException())
+                    {
+                        TSecondaryState::SetException(TPrimaryState::GetException());
+                        return;
+                    }
+
+                    auto innerFuture = TPrimaryState::GetResult();
+                    if (!innerFuture.Valid())
+                    {
+                        TSecondaryState::SetException(CreateFutureExceptionPtr(future_errc::broken_promise));
+                        return;
+                    }
+
+                    auto futureState = TSecondaryState::GetNotifier();
+                    innerFuture.Then([futureState = std::move(futureState)](auto future)
+                    {
+                        FutureHelper::SetResultFromFuture(*futureState, future);
+                    });
+                });
             }
 
-            R GetResult()
+            template<class TCallback>
+            void SetCallback(TCallback&& callback)
             {
-                auto lock = AquireLock();
-
-                Wait(lock);
-                CheckException();
-                return std::move(_result);
+                TPrimaryState::SetCallback(std::forward<TCallback>(callback));
             }
 
-            bool SetResult(const R& value)
+            polymorphic_allocator<TPrimaryState> Get_Allocator()
             {
-                if (!SetResultImpl(value))
-                    return false;
-
-                NotifyPromiseFullfilled();
-                return true;
+                return TPrimaryState::Get_Allocator();
             }
 
-            bool SetResult(R&& value)
+            bool HasException()
             {
-                if (!SetResultImpl(std::forward<R>(value)))
-                    return false;
-
-                NotifyPromiseFullfilled();
-                return true;
+                return TPrimaryState::HasException();
             }
 
-            bool SetResultAtThreadExit(const R& value)
+            std::exception_ptr GetException()
             {
-                if (!SetResultImpl(value))
-                    return false;
-
-                NotifyPromiseFullfilledAtThreadExit();
-                return true;
+                return TPrimaryState::GetException();
             }
 
-            bool SetResultAtThreadExit(R&& value)
+            bool SetException(std::exception_ptr ex)
             {
-                if (!SetResultImpl(std::forward<R>(value)))
-                    return false;
-
-                NotifyPromiseFullfilledAtThreadExit();
-                return true;
+                return TPrimaryState::SetException(ex);
             }
 
-        private:
-
-            bool SetResultImpl(const R& value)
+            decltype(auto) GetResult()
             {
-                auto lock = AquireLock();
-                if (!SetHasResult())
-                    return false;
-
-                _result = value;
-                return true;
+                return TPrimaryState::GetResult();
             }
 
-            bool SetResultImpl(R&& value)
+            decltype(auto) GetResult() const
             {
-                auto lock = AquireLock();
-                if (!SetHasResult())
-                    return false;
-
-                _result = std::forward<R>(value);
-                return true;
+                return TPrimaryState::GetResult();
             }
 
-            R _result;
-        };
-
-        template<typename R>
-        class State<R&> : public BasicState
-        {
-        public:
-            State() : _result(nullptr) { }
-
-            void SetResult(State& other)
+            template<class TValue>
+            bool SetResult(TValue&& value)
             {
-                {
-                    auto lock = AquireLock();
-
-                    _result = other._result;
-                    BasicState::SetResult(other);
-                }
-                NotifyPromiseFullfilled();
+                return TPrimaryState::SetResult(std::forward<TValue>(value));
             }
 
-            R& GetResult()
+            static std::shared_ptr<CompositeState> MakeState()
             {
-                auto lock = AquireLock();
-
-                Wait(lock);
-                CheckException();
-                return *_result;
+                return AllocState(std::allocator<CompositeState>());
             }
 
-            bool SetResult(R& value)
+            template<class Alloc, class = typename enable_if_not_same<CompositeState, Alloc>::type>
+            static std::shared_ptr<CompositeState> AllocState(const Alloc& alloc)
             {
-                if (!SetResultImpl(value))
-                    return false;
+                auto state = std::allocate_shared<CompositeState>(alloc, Tag(0), alloc);
 
-                NotifyPromiseFullfilled();
-                return true;
+                state->SetNotifier(state);
+
+                return state;
             }
 
-            bool SetResultAtThreadExit(R& value)
-            {
-                if (!SetResultImpl(value))
-                    return false;
+        protected:
 
-                NotifyPromiseFullfilledAtThreadExit();
-                return true;
+            void SetNotifier(const std::weak_ptr<CompositeState>& notifier)
+            {
+                TPrimaryState::SetNotifier(notifier);
+                TSecondaryState::SetNotifier(notifier);
             }
 
-        private:
-
-            bool SetResultImpl(R& value)
+            std::shared_ptr<TPrimaryState> GetNotifier()
             {
-                auto lock = AquireLock();
-                if (!SetHasResult())
-                    return false;
-
-                _result = &value;
-                return true;
-            }
-
-            R* _result;
-        };
-
-        template<>
-        class State<void> : public BasicState
-        {
-        public:
-
-            void SetResult(const State& other)
-            {
-                {
-                    auto lock = AquireLock();
-                    BasicState::SetResult(other);
-                }
-                NotifyPromiseFullfilled();
-            }
-
-            void GetResult()
-            {
-                auto lock = AquireLock();
-
-                Wait(lock);
-                CheckException();
-            }
-
-            bool SetResult()
-            {
-                if (!SetResultImpl())
-                    return false;
-
-                NotifyPromiseFullfilled();
-                return true;
-            }
-
-            bool SetResultAtThreadExit()
-            {
-                if (!SetResultImpl())
-                    return false;
-
-                NotifyPromiseFullfilledAtThreadExit();
-                return true;
-            }
-
-        private:
-
-            bool SetResultImpl()
-            {
-                auto lock = AquireLock();
-                if (!SetHasResult())
-                    return false;
-
-                return true;
+                return TPrimaryState::GetNotifier();
             }
         };
 
         template<class R>
         class BasicPromise
         {
-            using SharedState = std::shared_ptr<State<R>>;
+            using StateType = get_state_t<R>;
+            using SharedState = get_shared_state_t<R>;
             friend class FutureHelper;
         public:
-            BasicPromise() : _state(std::make_shared<State<R>>()) { }
+            BasicPromise() : _state(StateType::MakeState()) { }
             BasicPromise(const BasicPromise& other) = delete;
             BasicPromise(BasicPromise&& other) noexcept = default;
 
@@ -540,15 +701,16 @@ namespace eventual
 
             template<class Alloc>
             BasicPromise(std::allocator_arg_t, const Alloc& alloc) :
-                _state(std::allocate_shared<State<R>, Alloc>(alloc))
+                _state(StateType::AllocState(alloc))
             { }
 
             virtual ~BasicPromise() noexcept
             {
-                if (!Valid() || _state->HasResult())
+                auto state = _state;
+                if (!state || state->State::HasResult())
                     return;
 
-                _state->SetException(CreateFutureExceptionPtr(future_errc::broken_promise));
+                state->State::SetException(CreateFutureExceptionPtr(future_errc::broken_promise));
             }
 
             BasicPromise& operator=(const BasicPromise& rhs) = delete;
@@ -559,25 +721,23 @@ namespace eventual
                 _state.swap(other._state);
             }
 
-            Future<R> Get_Future();
-
         protected:
 
-            template<class... T>
-            void SetValue(T&&... value)
+            template<class TValue>
+            void SetValue(TValue&& value)
             {
                 auto state = ValidateState();
 
-                if (!state->SetResult(std::forward<T>(value)...))
+                if (!state->State::SetResult(std::forward<TValue>(value)))
                     throw CreateFutureError(future_errc::promise_already_satisfied);
             }
 
-            template<class... T>
-            void SetValueAtThreadExit(T&&... value)
+            template<class TValue>
+            void SetValueAtThreadExit(TValue&& value)
             {
                 auto state = ValidateState();
 
-                if (!state->SetResultAtThreadExit(std::forward<T>(value)...))
+                if (!state->State::SetResultAtThreadExit(std::forward<TValue>(value)))
                     throw CreateFutureError(future_errc::promise_already_satisfied);
             }
 
@@ -585,7 +745,7 @@ namespace eventual
             {
                 auto state = ValidateState();
 
-                if (!state->SetException(exceptionPtr))
+                if (!state->State::SetException(exceptionPtr))
                     throw CreateFutureError(future_errc::promise_already_satisfied);
             }
 
@@ -593,21 +753,22 @@ namespace eventual
             {
                 auto state = ValidateState();
 
-                if (!state->SetExceptionAtThreadExit(exceptionPtr))
+                if (!state->State::SetExceptionAtThreadExit(exceptionPtr))
                     throw CreateFutureError(future_errc::promise_already_satisfied);
             }
 
-            template<class... T>
-            bool TrySetValue(T&&... value) noexcept
+            template<class TValue>
+            bool TrySetValue(TValue&& value)
             {
                 auto state = ValidateState();
-                return state->SetResult(std::forward<T>(value)...);
+
+                return state->State::SetResult(std::forward<TValue>(value));
             }
 
             void Reset()
             {
                 // todo: save allocator somewhere?
-                _state = std::make_shared<State<R>>();
+                _state = StateType::MakeState();
             }
 
             bool Valid() const noexcept
@@ -616,11 +777,21 @@ namespace eventual
                 return state ? true : false;
             }
 
-            SharedState ValidateState()
+            SharedState ValidateState() const
             {
                 auto state = _state;
                 if (!state)
                     throw CreateFutureError(future_errc::no_state);
+
+                return state;
+            }
+
+            SharedState CopyState() const
+            {
+                auto state = ValidateState();
+
+                if (!state->State::SetRetrieved())
+                    throw CreateFutureError(future_errc::future_already_retrieved);
 
                 return state;
             }
@@ -630,31 +801,32 @@ namespace eventual
             SharedState _state;
         };
 
-        template<class R, class... ArgTypes>
+        template<class TFunctor, class R, class... ArgTypes>
         class BasicTask : public BasicPromise<R>
         {
             using Base = detail::BasicPromise<R>;
 
         public:
+
             BasicTask() noexcept : Base(nullptr) { }
             BasicTask(const BasicTask&) = delete;
             BasicTask(BasicTask&& other) noexcept
                 : Base(std::forward<BasicTask>(other)), _task(std::move(other._task))
             { }
 
-            template<class F, class Allocator, class = detail::enable_if_not_same<BasicTask, F>>
+            template<class F, class Allocator, class = enable_if_not_same<BasicTask, F>::type>
             BasicTask(std::allocator_arg_t arg, const Allocator& alloc, F&& task)
-                : Base(arg, alloc), _task(CreateSharedFunction<Allocator, F, R, ArgTypes...>(alloc, std::forward<F>(task)))
+                : Base(arg, alloc), _task(CreateFunctor<TFunctor>(alloc, std::forward<F>(task)))
             { }
 
-            template<class F, class = detail::enable_if_not_same<BasicTask, F>>
+            template<class F, class = enable_if_not_same<BasicTask, F>::type>
             BasicTask(F&& task)
-                : Base(), _task(MakeSharedFunction(std::forward<F>(task)))
+                : Base(), _task(std::forward<F>(task))
             { }
 
             BasicTask& operator=(BasicTask&& other) noexcept
             {
-                _task = _task(std::move(other._task));
+                _task = std::move(other._task);
                 Base::operator=(std::forward<BasicTask>(other));
                 return *this;
             }
@@ -678,11 +850,10 @@ namespace eventual
             {
                 try
                 {
-                    ExecuteTask<R>(std::forward<ArgTypes>(args)...);
+                    Base::SetValue(_task(std::forward<ArgTypes>(args)...));
                 }
                 catch (const future_error& error)
                 {
-                    //todo: verify this behavior...
                     if (error.code() != future_errc::promise_already_satisfied)
                         Base::SetException(std::current_exception());
                     else
@@ -698,11 +869,10 @@ namespace eventual
             {
                 try
                 {
-                    ExecuteTaskDeferred<R>(std::forward<ArgTypes>(args)...);
+                    Base::SetValueAtThreadExit(_task(std::forward<ArgTypes>(args)...));
                 }
                 catch (const future_error& error)
                 {
-                    //todo: verify this behavior...
                     if (error.code() != future_errc::promise_already_satisfied)
                         Base::SetExceptionAtThreadExit(std::current_exception());
                     else
@@ -716,64 +886,121 @@ namespace eventual
 
         private:
 
-            template<typename T>
-            std::enable_if_t<!std::is_void<T>::value>
-                ExecuteTask(ArgTypes... args)
+            TFunctor _task;
+        };
+
+        template<class TFunctor, class... ArgTypes>
+        class BasicTask<TFunctor, void, ArgTypes...> : public BasicPromise<void>
+        {
+            using Base = detail::BasicPromise<void>;
+
+        public:
+
+            BasicTask() noexcept : Base(nullptr) { }
+            BasicTask(const BasicTask&) = delete;
+            BasicTask(BasicTask&& other) noexcept
+                : Base(std::forward<BasicTask>(other)), _task(std::move(other._task))
+            { }
+
+            template<class F, class Allocator, class = enable_if_not_same<BasicTask, F>::type>
+            BasicTask(std::allocator_arg_t arg, const Allocator& alloc, F&& task)
+                : Base(arg, alloc), _task(CreateFunctor<TFunctor>(alloc, std::forward<F>(task)))
+            { }
+
+            template<class F, class = enable_if_not_same<BasicTask, F>::type>
+            BasicTask(F&& task)
+                : Base(), _task(std::forward<F>(task))
+            { }
+
+            BasicTask& operator=(BasicTask&& other) noexcept
             {
-                Base::SetValue(_task(std::forward<ArgTypes>(args)...));
+                _task = std::move(other._task);
+                Base::operator=(std::forward<BasicTask>(other));
+                return *this;
             }
 
-            template<typename T>
-            std::enable_if_t<std::is_void<T>::value>
-                ExecuteTask(ArgTypes... args)
+            void Swap(BasicTask& other) noexcept
             {
-                _task(std::forward<ArgTypes>(args)...);
-                Base::SetValue();
+                Base::Swap(other);
+                std::swap(_task, other._task);
             }
 
-            template<typename T>
-            std::enable_if_t<!std::is_void<T>::value>
-                ExecuteTaskDeferred(ArgTypes... args)
+            void Reset()
             {
-                Base::SetValueAtThreadExit(_task(std::forward<ArgTypes>(args)...));
+                Base::ValidateState();
+
+                Base::Reset();
             }
 
-            template<typename T>
-            std::enable_if_t<std::is_void<T>::value>
-                ExecuteTaskDeferred(ArgTypes... args)
+            bool Valid() { return Base::Valid(); }
+
+            void operator()(ArgTypes... args)
             {
-                _task(std::forward<ArgTypes>(args)...);
-                Base::SetValueAtThreadExit();
+                try
+                {
+                    _task(std::forward<ArgTypes>(args)...);
+                    Base::SetValue(Unit());
+                }
+                catch (const future_error& error)
+                {
+                    if (error.code() != future_errc::promise_already_satisfied)
+                        Base::SetException(std::current_exception());
+                    else
+                        throw;
+                }
+                catch (...)
+                {
+                    Base::SetException(std::current_exception());
+                }
             }
 
-            std::function<R(ArgTypes...)> _task;
+            void Make_Ready_At_Thread_Exit(ArgTypes... args)
+            {
+                try
+                {
+                    _task(std::forward<ArgTypes>(args)...);
+                    Base::SetValueAtThreadExit(Unit());
+                }
+                catch (const future_error& error)
+                {
+                    if (error.code() != future_errc::promise_already_satisfied)
+                        Base::SetExceptionAtThreadExit(std::current_exception());
+                    else
+                        throw;
+                }
+                catch (...)
+                {
+                    Base::SetExceptionAtThreadExit(std::current_exception());
+                }
+            }
+
+        private:
+
+            TFunctor _task;
         };
 
         template<class R>
         class BasicFuture
         {
-            using State = detail::State<R>;
-            using SharedState = std::shared_ptr<State>;
-            using unique_lock = std::unique_lock<std::mutex>;
-
             template<class>
             friend class BasicFuture;
             friend class FutureHelper;
+
+        protected:
+            using SharedState = get_shared_state_t<R>;
 
         public:
             BasicFuture() noexcept = default;
             BasicFuture(const BasicFuture& other) = default;
             BasicFuture(BasicFuture&& other) noexcept = default;
 
-            explicit BasicFuture(const SharedState& state) : _state(state) { }
+            BasicFuture(SharedState&& state) noexcept : _state(std::forward<SharedState>(state)) { }
 
             BasicFuture& operator=(const BasicFuture& rhs) = default;
             BasicFuture& operator=(BasicFuture&& other) noexcept = default;
 
             bool Valid() const noexcept { return _state ? true : false; }
             bool Is_Ready() const noexcept { return (_state && _state->Is_Ready()); }
-
-            Shared_Future<R> Share();
 
             void Wait() const
             {
@@ -797,61 +1024,10 @@ namespace eventual
 
         protected:
 
-            template<class T>
-            static decltype(auto) GetResult(BasicFuture<T>& future)
-            {
-                auto state = future.ValidateState();
-                future.ResetState();
-                return state->GetResult();
-            }
-
-            template<class T>
-            static decltype(auto) GetSharedResult(BasicFuture<T>& future)
-            {
-                auto state = future.ValidateState();
-                return state->GetResult();
-            }
-
-            static void GetResult(BasicFuture<void>& future)
-            {
-                auto state = future.ValidateState();
-                future.ResetState();
-                state->GetResult();
-            }
-
-            static void GetSharedResult(BasicFuture<void>& future)
-            {
-                auto state = future.ValidateState();
-                state->GetResult();
-            }
-
-            template<template<typename> class NestedFuture>
-            BasicFuture(BasicFuture<NestedFuture<R>>&& other)
-                : BasicFuture(SharedState(new State()))
-            {
-                auto outerState = std::move(other._state);
-                auto futureState = _state;
-
-                // todo: Yo dawg; I heard you like continuations...
-                outerState->SetCallback([outerState, futureState]()
-                {
-                    if (!outerState->HasException())
-                    {
-                        auto innerState = outerState->GetResult()._state;
-                        if (innerState)
-                        {
-                            innerState->SetCallback([futureState, innerState]()
-                            {
-                                futureState->SetResult(*innerState);
-                            });
-                        }
-                        else
-                            futureState->SetException(CreateFutureExceptionPtr(future_errc::no_state));
-                    }
-                    else
-                        futureState->SetException(outerState->GetException());
-                });
-            }
+            template<template<typename> class NestedFuture, class T>
+            BasicFuture(BasicFuture<NestedFuture<T>>&& other) noexcept
+                : BasicFuture(std::move(other._state))
+            { }
 
             SharedState ValidateState() const
             {
@@ -862,19 +1038,54 @@ namespace eventual
                 return state;
             }
 
-            //todo: SFINAE way to prevent [](Future&){...} continuations (clang doesn't like them...)
+            decltype(auto) GetResult()
+            {
+                auto state = ValidateState();
+                ResetState();
+                return state->GetResult();
+            }
+
+            decltype(auto) GetResult() const
+            {
+                auto state = ValidateState();
+                const auto& stateRef = *state;
+                return stateRef.GetResult();
+            }
+
+            SharedState MoveState()
+            {
+                auto state = std::move(_state);
+
+                if (!state)
+                    throw CreateFutureError(future_errc::no_state);
+
+                return state;
+            }
+
+            template<class TContinuation, class TFuture>
+            static decltype(auto) ThenMove(TContinuation&& continuation, TFuture& future)
+            {
+                return ThenImpl(decay_copy(std::forward<TContinuation>(continuation)), std::move(future));
+            }
+
+            template<class TContinuation, class TFuture>
+            static decltype(auto) ThenShare(TContinuation&& continuation, const TFuture& future)
+            {
+                return ThenImpl(decay_copy(std::forward<TContinuation>(continuation)), TFuture(future));
+            }
+
             template<class TContinuation, class TFuture>
             static decltype(auto) ThenImpl(TContinuation&& continuation, TFuture&& future)
             {
                 using namespace std;
-
-                using result_t = result_of_t<TContinuation(TFuture)>;
-
+                using task_t = get_continuation_task_t<TFuture, TContinuation>;
+                
                 auto current = forward<TFuture>(future);
                 auto state = current.ValidateState();
+                auto allocator = state->Get_Allocator();
 
-                BasicTask<result_t, TFuture> task(forward<TContinuation>(continuation));
-                auto taskFuture = Unwrap(task.Get_Future());
+                task_t task(allocator_arg_t(), allocator, forward<TContinuation>(continuation));
+                auto taskFuture = GetUnwrappedFuture(task);
 
                 state->SetCallback(
                     [
@@ -889,6 +1100,17 @@ namespace eventual
             }
 
         private:
+
+            decltype(auto) GetState()
+            {
+                return _state;
+            }
+
+            template<class TResult>
+            static decltype(auto) GetUnwrappedFuture(const BasicPromise<TResult>& promise)
+            {
+                return Unwrap(FutureHelper::Get_Future(promise));
+            }
 
             template<typename T, template<typename> class TOuter, template<typename> class TInner>
             static enable_if_future_t<TInner<T>> Unwrap(TOuter<TInner<T>>&& future)
@@ -910,83 +1132,17 @@ namespace eventual
             SharedState _state;
         };
 
-        class FutureHelper
+        template<class TState, class T>
+        void FutureHelper::SetResultFromFuture(TState& state, BasicFuture<T>& future)
         {
-        private:
-            template<class>
-            struct result_of_future { };
-
-            template<class R>
-            struct result_of_future<Shared_Future<R>>
+            auto innerState = future.GetState();
+            if (innerState->HasException())
             {
-                typedef R result_type;
-            };
-
-            template<class R>
-            struct result_of_future<Future<R>>
-            {
-                typedef R result_type;
-            };
-
-            template<class TFuture>
-            using future_state = std::shared_ptr<State<typename result_of_future<TFuture>::result_type>>;
-
-        public:
-
-            template<class T>
-            static T CreateFuture(const future_state<T>& state);
-
-            template<class InputIterator>
-            static decltype(auto) When_Any(enable_if_iterator_t<InputIterator> begin, InputIterator end);
-
-            inline static Future<When_Any_Result<std::tuple<>>> When_Any();
-
-            template<class... Futures>
-            static decltype(auto) When_Any(Futures&&... futures);
-
-            template<class InputIterator>
-            static decltype(auto) When_All(enable_if_iterator_t<InputIterator> first, InputIterator last)
-            {
-                using namespace std;
-                using future_vector_t = vector<typename iterator_traits<InputIterator>::value_type>;
-
-                auto vectorFuture = Make_Ready_Future(future_vector_t());
-
-                for (auto iterator = first; iterator != last; ++iterator)
-                {
-                    auto& future = *iterator;
-                    vectorFuture = vectorFuture.Then(
-                        [future = move(future)](auto vf) mutable
-                    {
-                        return future.Then(
-                            [vf = move(vf)](auto future) mutable
-                        {
-                            auto resultVector = vf.Get();
-                            resultVector.emplace_back(move(future));
-                            return resultVector;
-                        });
-                    });
-                }
-
-                return vectorFuture;
+                state.SetException(innerState->GetException());
+                return;
             }
 
-            static inline decltype(auto) When_All();
-
-            template<class TFuture, class... TFutures>
-            static decltype(auto) When_All(TFuture&& head, TFutures&&... others)
-            {
-                using namespace std;
-
-                auto tailFuture = When_All(forward<TFutures>(others)...);
-                return tailFuture.Then([head = move(head)](auto tf) mutable
-                {
-                    return head.Then([tf = move(tf)](auto h) mutable
-                    {
-                        return tuple_cat(make_tuple(move(h)), tf.Get());
-                    });
-                });
-            }
-        };
+            state.SetResult(future.GetResult());
+        }
     }
 }

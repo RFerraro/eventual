@@ -27,6 +27,8 @@
 #include <future>
 #include <exception>
 
+#include "traits.h"
+
 namespace eventual
 {
     namespace detail
@@ -70,6 +72,21 @@ namespace eventual
                 ptr = std::current_exception();
             }
             return ptr;
+        }
+
+        template<class TFunctor, class TCallable, class Allocator>
+        static detail::enable_if_uses_allocator_t<TFunctor, Allocator>
+            CreateFunctor(const Allocator& alloc, TCallable&& function)
+        {
+            return TFunctor(std::allocator_arg_t(), alloc, std::forward<TCallable>(function));
+        }
+
+        template<class TFunctor, class TCallable, class Allocator>
+        static detail::enable_if_doesnt_use_allocator_t<TFunctor, Allocator>
+            CreateFunctor(const Allocator&, TCallable&& function)
+        {
+            // because libstdc++'s std::function doesn't support custom allocation...
+            return TFunctor(std::forward<TCallable>(function));
         }
     }
 }

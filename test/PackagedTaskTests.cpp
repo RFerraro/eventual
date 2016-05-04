@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include <thread>
+#include <cstdint>
 #include <eventual/eventual.h>
 #include "BasicAllocator.h"
 
@@ -28,15 +29,29 @@ TEST(PackagedTaskTest, ConstructorWithFunctorCreatesValidTask)
    EXPECT_TRUE(task.Valid());
 }
 
+namespace
+{
+    typedef int(*dummy_t)(int object);
+}
+
 TEST(PackagedTaskTest, ConstructorWithAllocatorCreatesValidTask)
 {
-   // Arrange
-   auto alloc = BasicAllocator<int>();
-   Packaged_Task<int(int)> task(std::allocator_arg_t(), alloc, [](int i) { return i; });
+    // Arrange
+    auto alloc = BasicAllocator<int>();
 
-   // Act/Assert
-   EXPECT_TRUE(task.Valid());
-   EXPECT_EQ(2, alloc.GetCount());
+    // create a stupid-large type to force std::function to use the allocator
+    struct large
+    {
+        int_least64_t data[12];
+    };
+
+    large capture;
+
+    Packaged_Task<int(int)> task(std::allocator_arg_t(), alloc, [capture](int i) { return  i; });
+
+    // Act/Assert
+    EXPECT_TRUE(task.Valid());
+    EXPECT_GT(alloc.GetCount(), 0);
 }
 
 TEST(PackagedTaskTest, IsMoveConstructable)
@@ -135,6 +150,20 @@ TEST(PackagedTaskTest, IsSwapable)
    EXPECT_FALSE(task.Valid());
 }
 
+TEST(PackagedTaskTest, IsSwapableWithVoid)
+{
+    // Arrange
+    Packaged_Task<void(int)> task([](int) { });
+    Packaged_Task<void(int)> moved;
+
+    // Act
+    task.Swap(moved);
+
+    // Assert
+    EXPECT_TRUE(moved.Valid());
+    EXPECT_FALSE(task.Valid());
+}
+
 TEST(PackagedTaskTest, STD_IsSwapable)
 {
    // Arrange
@@ -194,6 +223,22 @@ TEST(PackagedTaskTest, Execute_FullfillsTaskPromise)
    EXPECT_EQ(expected, future.Get());
 }
 
+TEST(PackagedTaskTest, ExecuteWithVoidResult_FullfillsTaskPromise)
+{
+    // Arrange
+    int expected = 3;
+    auto actualPtr = std::make_unique<int>(0);
+    Packaged_Task<void(int)> task([ptr = actualPtr.get()](int i) { *ptr = i; });
+    auto future = task.Get_Future();
+
+    // Act
+    task(expected);
+    future.Get();
+
+    // Assert
+    EXPECT_EQ(expected, *actualPtr);
+}
+
 TEST(PackagedTaskTest, Execute_ForwardsTaskExceptions)
 {
    // Arrange
@@ -220,6 +265,19 @@ TEST(PackagedTaskTest, Execute_ForwardsTaskExceptions_FutureError)
    EXPECT_THROW(future.Get(), future_error);
 }
 
+TEST(PackagedTaskTest, ExecuteWithVoid_ForwardsTaskExceptions_FutureError)
+{
+    // Arrange
+    Packaged_Task<void(int)> task([](int) { throw future_error(std::make_error_code(future_errc::no_state)); });
+    auto future = task.Get_Future();
+
+    // Act
+    task(0);
+
+    // Assert
+    EXPECT_THROW(future.Get(), future_error);
+}
+
 TEST(PackagedTaskTest, Execute_ThrowsIfTaskIsInvalid)
 {
    // Arrange
@@ -237,6 +295,16 @@ TEST(PackagedTaskTest, Execute_ThrowsIfTaskPromiseSatisfied)
 
    // Act/Assert
    EXPECT_THROW(task(0), future_error);
+}
+
+TEST(PackagedTaskTest, ExecuteWithVoid_ThrowsIfTaskPromiseSatisfied)
+{
+    // Arrange
+    Packaged_Task<void(int)> task([](int) { });
+    task(0);
+
+    // Act/Assert
+    EXPECT_THROW(task(0), future_error);
 }
 
 TEST(PackagedTaskTest, MakeReadyAtThreadExit_FullfillsTaskPromise)
@@ -331,6 +399,36 @@ TEST(PackagedTaskTest, MakeReadyAtThreadExit_ForwardsTaskExceptions)
    EXPECT_THROW(future.Get(), PackagedTaskTestException);
 }
 
+TEST(PackagedTaskTest, MakeReadyAtThreadExitVoid_ForwardsTaskExceptions)
+{
+    // Arrange
+    Packaged_Task<void(int)> task([](int) { throw PackagedTaskTestException(); });
+    auto future = task.Get_Future();
+
+    std::mutex m;
+    std::condition_variable cv;
+    bool ready = false;
+
+    // Act
+    std::thread worker([&]()
+    {
+        task.Make_Ready_At_Thread_Exit(3);
+
+        std::unique_lock<std::mutex> l(m);
+        cv.wait(l, [&]() { return ready; });
+    });
+
+    // Assert
+    EXPECT_FALSE(future.Is_Ready()) << "The value changed signal was set prematurely.";
+    {
+        std::unique_lock<std::mutex> l(m);
+        ready = true;
+    }
+    cv.notify_all();
+    worker.join();
+    EXPECT_THROW(future.Get(), PackagedTaskTestException);
+}
+
 TEST(PackagedTaskTest, MakeReadyAtThreadExit_ForwardsTaskExceptions_FutureError)
 {
    // Arrange
@@ -361,6 +459,36 @@ TEST(PackagedTaskTest, MakeReadyAtThreadExit_ForwardsTaskExceptions_FutureError)
    EXPECT_THROW(future.Get(), future_error);
 }
 
+TEST(PackagedTaskTest, MakeReadyAtThreadExitVoid_ForwardsTaskExceptions_FutureError)
+{
+    // Arrange
+    Packaged_Task<void(int)> task([](int) { throw future_error(std::make_error_code(future_errc::no_state)); });
+    auto future = task.Get_Future();
+
+    std::mutex m;
+    std::condition_variable cv;
+    bool ready = false;
+
+    // Act
+    std::thread worker([&]()
+    {
+        task.Make_Ready_At_Thread_Exit(3);
+
+        std::unique_lock<std::mutex> l(m);
+        cv.wait(l, [&]() { return ready; });
+    });
+
+    // Assert
+    EXPECT_FALSE(future.Is_Ready()) << "The value changed signal was set prematurely.";
+    {
+        std::unique_lock<std::mutex> l(m);
+        ready = true;
+    }
+    cv.notify_all();
+    worker.join();
+    EXPECT_THROW(future.Get(), future_error);
+}
+
 TEST(PackagedTaskTest, MakeReadyAtThreadExit_ThrowsIfTaskIsInvalid)
 {
    // Arrange
@@ -378,6 +506,16 @@ TEST(PackagedTaskTest, MakeReadyAtThreadExit_ThrowsIfTaskPromiseSatisfied)
 
    // Act/Assert
    EXPECT_THROW(task.Make_Ready_At_Thread_Exit(0), future_error);
+}
+
+TEST(PackagedTaskTest, MakeReadyAtThreadExitVoid_ThrowsIfTaskPromiseSatisfied)
+{
+    // Arrange
+    Packaged_Task<void(int)> task([](int) { });
+    task.Make_Ready_At_Thread_Exit(0);
+
+    // Act/Assert
+    EXPECT_THROW(task.Make_Ready_At_Thread_Exit(0), future_error);
 }
 
 TEST(PackagedTaskTest, Reset_ResetsPromiseState)

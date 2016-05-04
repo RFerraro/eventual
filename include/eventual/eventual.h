@@ -29,23 +29,20 @@
 
 namespace eventual
 {
-    template <class R> class Future;
-    template <class R> class Shared_Future;
-    template <class> class Packaged_Task; // undefined
-    template <class R, class... ArgTypes>
-    class Packaged_Task<R(ArgTypes...)>;
-
-    template<class Sequence>
-    struct When_Any_Result;
-
     using future_errc = std::future_errc;
     using future_error = std::future_error;
     using future_status = std::future_status;
 
+    template<class R>
+    class Shared_Future;
+
+    template<class R>
+    class Promise;
+
     template<class Sequence>
     struct When_Any_Result
     {
-        size_t index;
+        size_t index = size_t(-1);
         Sequence futures;
     };
 
@@ -53,7 +50,9 @@ namespace eventual
     class Future : public detail::BasicFuture<RType>
     {
         using Base = detail::BasicFuture<RType>;
+        using SharedState = typename Base::SharedState;
         friend class detail::FutureHelper;
+        friend class Promise<RType>;
 
     public:
         Future() noexcept = default;
@@ -67,20 +66,27 @@ namespace eventual
         template<class F>
         decltype(auto) Then(F&& continuation)
         {
-            return Base::ThenImpl(detail::decay_copy(std::forward<F>(continuation)), std::move(*this));
+            return Base::ThenMove(std::forward<F>(continuation), *this);
         }
 
-        decltype(auto) Get()
+        RType Get()
         {
-            return Base::GetResult(*this);
+            return Base::GetResult();
         }
+
+        Shared_Future<RType> Share();
+
+    private:
+        Future(SharedState&& other) : Base(std::forward<SharedState>(other)) { }
     };
 
     template<class RType>
     class Future<RType&> : public detail::BasicFuture<RType&>
     {
         using Base = detail::BasicFuture<RType&>;
+        using SharedState = typename Base::SharedState;
         friend class detail::FutureHelper;
+        friend class Promise<RType&>;
 
     public:
         Future() noexcept = default;
@@ -94,20 +100,27 @@ namespace eventual
         template<class F>
         decltype(auto) Then(F&& continuation)
         {
-            return Base::ThenImpl(detail::decay_copy(std::forward<F>(continuation)), std::move(*this));
+            return Base::ThenMove(std::forward<F>(continuation), *this);
         }
 
-        decltype(auto) Get()
+        RType& Get()
         {
-            return Base::GetResult(*this);
+            return Base::GetResult();
         }
+
+        Shared_Future<RType&> Share();
+
+    private:
+        Future(SharedState&& other) : Base(std::forward<SharedState>(other)) { }
     };
 
     template<>
     class Future<void> : public detail::BasicFuture<void>
     {
         using Base = detail::BasicFuture<void>;
+        using SharedState = typename Base::SharedState;
         friend class detail::FutureHelper;
+        friend class Promise<void>;
 
     public:
         Future() noexcept = default;
@@ -121,13 +134,18 @@ namespace eventual
         template<class F>
         decltype(auto) Then(F&& continuation)
         {
-            return Base::ThenImpl(detail::decay_copy(std::forward<F>(continuation)), std::move(*this));
+            return Base::ThenMove(std::forward<F>(continuation), *this);
         }
 
-        decltype(auto) Get()
+        void Get()
         {
-            return Base::GetResult(*this);
+            Base::GetResult();
         }
+
+        Shared_Future<void> Share();
+
+    private:
+        Future(SharedState&& other) : Base(std::forward<SharedState>(other)) { }
     };
 
     template<class R>
@@ -148,6 +166,8 @@ namespace eventual
         Promise& operator=(Promise&& other) noexcept = default;
 
         void Swap(Promise& other) noexcept { Base::Swap(other); }
+
+        Future<R> Get_Future() { return Future<R>(Base::CopyState()); }
 
         void Set_Value(const R& value) { Base::SetValue(value); }
         void Set_Value(R&& value) { Base::SetValue(std::forward<R>(value)); }
@@ -176,6 +196,8 @@ namespace eventual
 
         void Swap(Promise& other) noexcept { Base::Swap(other); }
 
+        Future<R&> Get_Future() { return Future<R&>(Base::CopyState()); }
+
         void Set_Value(R& value) { Base::SetValue(value); }
         void Set_Value_At_Thread_Exit(R& value) { Base::SetValueAtThreadExit(value); }
         void Set_Exception(std::exception_ptr exceptionPtr) { Base::SetException(exceptionPtr); }
@@ -201,8 +223,10 @@ namespace eventual
 
         void Swap(Promise& other) noexcept { Base::Swap(other); }
 
-        void Set_Value() { Base::SetValue(); }
-        void Set_Value_At_Thread_Exit() { Base::SetValueAtThreadExit(); }
+        Future<void> Get_Future() { return Future<void>(Base::CopyState()); }
+
+        void Set_Value() { Base::SetValue(detail::Unit()); }
+        void Set_Value_At_Thread_Exit() { Base::SetValueAtThreadExit(detail::Unit()); }
         void Set_Exception(std::exception_ptr exceptionPtr) { Base::SetException(exceptionPtr); }
         void Set_Exception_At_Thread_Exit(std::exception_ptr exceptionPtr) { Base::SetExceptionAtThreadExit(exceptionPtr); }
     };
@@ -211,7 +235,8 @@ namespace eventual
     class Shared_Future : public detail::BasicFuture<R>
     {
         using Base = detail::BasicFuture<R>;
-        friend class detail::FutureHelper;
+        using SharedState = typename Base::SharedState;
+        friend class Future<R>;
 
     public:
 
@@ -224,25 +249,27 @@ namespace eventual
         Shared_Future& operator=(const Shared_Future& other) = default;
         Shared_Future& operator=(Shared_Future&& other) noexcept = default;
 
-        Shared_Future Share() = delete;
-
         template<class F>
         decltype(auto) Then(F&& continuation)
         {
-            return Base::ThenImpl(detail::decay_copy(std::forward<F>(continuation)), Shared_Future(*this));
+            return Base::ThenShare(std::forward<F>(continuation), *this);
         }
 
-        decltype(auto) Get()
+        const R& Get() const
         {
-            return Base::GetSharedResult(*this);
+            return Base::GetResult();
         }
+
+    private:
+        Shared_Future(SharedState&& other) : Base(std::forward<SharedState>(other)) { }
     };
 
     template<class R>
     class Shared_Future<R&> : public detail::BasicFuture<R&>
     {
         using Base = detail::BasicFuture<R&>;
-        friend class detail::FutureHelper;
+        using SharedState = typename Base::SharedState;
+        friend class Future<R&>;
 
     public:
 
@@ -255,25 +282,27 @@ namespace eventual
         Shared_Future& operator=(const Shared_Future& other) = default;
         Shared_Future& operator=(Shared_Future&& other) noexcept = default;
 
-        Shared_Future Share() = delete;
-
         template<class F>
         decltype(auto) Then(F&& continuation)
         {
-            return Base::ThenImpl(detail::decay_copy(std::forward<F>(continuation)), Shared_Future(*this));
+            return Base::ThenShare(std::forward<F>(continuation), *this);
         }
 
-        decltype(auto) Get()
+        R& Get() const
         {
-            return Base::GetSharedResult(*this);
+            return Base::GetResult();
         }
+
+    private:
+        Shared_Future(SharedState&& other) : Base(std::forward<SharedState>(other)) { }
     };
 
     template<>
     class Shared_Future<void> : public detail::BasicFuture<void>
     {
         using Base = detail::BasicFuture<void>;
-        friend class detail::FutureHelper;
+        using SharedState = typename Base::SharedState;
+        friend class Future<void>;
 
     public:
 
@@ -287,24 +316,27 @@ namespace eventual
         Shared_Future& operator=(const Shared_Future& other) = default;
         Shared_Future& operator=(Shared_Future&& other) noexcept = default;
 
-        Shared_Future Share() = delete;
-
         template<class F>
         decltype(auto) Then(F&& continuation)
         {
-            return Base::ThenImpl(detail::decay_copy(std::forward<F>(continuation)), Shared_Future(*this));
+            return Base::ThenShare(std::forward<F>(continuation), *this);
         }
 
-        decltype(auto) Get()
+        void Get() const
         {
-            return Base::GetSharedResult(*this);
+            Base::GetResult();
         }
+
+    private:
+        Shared_Future(SharedState&& other) : Base(std::forward<SharedState>(other)) { }
     };
 
+    template <class> class Packaged_Task; // undefined
+
     template<class R, class... ArgTypes>
-    class Packaged_Task<R(ArgTypes...)> : public detail::BasicTask<R, ArgTypes...>
+    class Packaged_Task<R(ArgTypes...)> : public detail::BasicTask<std::function<R(ArgTypes...)>, R, ArgTypes...>
     {
-        using Base = detail::BasicTask<R, ArgTypes...>;
+        using Base = detail::BasicTask<std::function<R(ArgTypes...)>, R, ArgTypes...>;
 
     public:
         Packaged_Task() noexcept = default;
@@ -313,19 +345,38 @@ namespace eventual
 
         template<class F, class = detail::enable_if_not_same<Packaged_Task, F>>
         explicit Packaged_Task(F&& task)
-            : Base(std::forward<F>(task))
+            : Base(detail::decay_copy(std::forward<F>(task)))
         { }
 
         template<class F, class Allocator, class = detail::enable_if_not_same<Packaged_Task, F>>
         Packaged_Task(std::allocator_arg_t arg, const Allocator& alloc, F&& task)
-            : Base(arg, alloc, std::forward<F>(task))
+            : Base(arg, alloc, detail::decay_copy(std::forward<F>(task)))
         { }
 
         Packaged_Task& operator=(const Packaged_Task&) = delete;
         Packaged_Task& operator=(Packaged_Task&&) noexcept = default;
 
         void Swap(Packaged_Task& other) { Base::Swap(other); }
+
+        Future<R> Get_Future() { return detail::FutureHelper::Get_Future(*this); }
     };
+
+    template<class R>
+    Shared_Future<R> Future<R>::Share()
+    {
+        return Shared_Future<R>(Base::MoveState());
+    }
+
+    template<class R>
+    Shared_Future<R&> Future<R&>::Share()
+    {
+        return Shared_Future<R&>(Base::MoveState());
+    }
+
+    inline Shared_Future<void> Future<void>::Share()
+    {
+        return Shared_Future<void>(Base::MoveState());
+    }
 
     template<class T>
     Future<detail::decay_future_result_t<T>>
@@ -364,28 +415,117 @@ namespace eventual
     detail::all_futures_vector<InputIterator>
         When_All(InputIterator first, InputIterator last)
     {
-        return detail::FutureHelper::When_All(first, last);
+        using namespace std;
+        using future_vector_t = vector<typename iterator_traits<InputIterator>::value_type>;
+
+        auto vectorFuture = Make_Ready_Future(future_vector_t());
+
+        for (auto iterator = first; iterator != last; ++iterator)
+        {
+            auto& future = *iterator;
+            vectorFuture = vectorFuture.Then(
+                [future = move(future)](auto vf) mutable
+            {
+                return future.Then(
+                    [vf = move(vf)](auto future) mutable
+                {
+                    auto resultVector = vf.Get();
+                    resultVector.emplace_back(move(future));
+                    return resultVector;
+                });
+            });
+        }
+
+        return vectorFuture;
     }
 
     template<class... Futures>
     detail::all_futures_tuple<Futures...>
         When_All(Futures&&... futures)
     {
-        return detail::FutureHelper::When_All(std::forward<Futures>(futures)...);
+        return detail::When_All_(std::forward<Futures>(futures)...);
     }
 
     template<class InputIterator>
     detail::any_future_result_vector<InputIterator>
         When_Any(InputIterator first, InputIterator last)
     {
-        return detail::FutureHelper::When_Any(first, last);
+        using namespace std;
+        using namespace eventual::detail;
+        using future_t = typename iterator_traits<InputIterator>::value_type;
+        using result_t = When_Any_Result<vector<future_t>>;
+
+        constexpr auto noIdx = size_t(-1);
+        auto indexPromise = make_shared<Promise<size_t>>();
+        auto indexFuture = indexPromise->Get_Future();
+        vector<future_t> futures;
+
+        size_t index = 0;
+        for (auto iterator = first; iterator != last; ++iterator)
+        {
+            futures.emplace_back(move(*iterator));
+
+            FutureHelper::SetCallback(futures.back(),
+                        [indexPromise, index]()
+            {
+                FutureHelper::TrySetValue(*indexPromise, index);
+            });
+
+            index++;
+        }
+
+        if (futures.empty())
+            indexPromise->Set_Value(noIdx);
+
+        return indexFuture.Then(
+            [sequence = std::move(futures)](auto firstIndex) mutable
+        {
+            result_t result;
+            result.index = firstIndex.Get();
+            result.futures = move(sequence);
+
+            return result;
+        });
     }
 
     template<class... Futures>
     detail::any_futures_result_tuple<Futures...>
         When_Any(Futures&&... futures)
     {
-        return detail::FutureHelper::When_Any(std::forward<Futures>(futures)...);
+        using namespace std;
+        using namespace eventual::detail;
+        using result_t = When_Any_Result<tuple<decay_t<Futures>...>>;
+
+        auto futuresSequence = make_tuple<decay_t<Futures>...>(forward<Futures>(futures)...);
+        auto indexPromise = make_shared<Promise<size_t>>();
+        auto indexFuture = indexPromise->Get_Future();
+
+        size_t index = 0;
+        detail::for_each(futuresSequence, [indexPromise, &index](auto& future) mutable
+        {
+            FutureHelper::SetCallback(future,
+                        [indexPromise, index]()
+            {
+                FutureHelper::TrySetValue(*indexPromise, index);
+            });
+
+            index++;
+        });
+
+        return indexFuture.Then(
+            [sequence = move(futuresSequence)](auto firstIndex) mutable
+        {
+            result_t result;
+            result.index = firstIndex.Get();
+            result.futures = move(sequence);
+
+            return result;
+        });
+    }
+
+    inline Future<When_Any_Result<std::tuple<>>> When_Any()
+    {
+        return Make_Ready_Future(When_Any_Result<std::tuple<>>());
     }
 }
 
@@ -414,119 +554,30 @@ namespace eventual
 {
     namespace detail
     {
-        decltype(auto) FutureHelper::When_All()
+        template<class TUnit>
+        decltype(auto) FutureHelper::Get_Future(const BasicPromise<TUnit>& promise)
+        {
+            return Future<type_from_unit_t<TUnit>>(promise.CopyState());
+        }
+
+        template<class Future, class... Futures>
+        decltype(auto) When_All_(Future&& head, Futures&&... others)
+        {
+            using namespace std;
+
+            auto tailFuture = When_All_(forward<Futures>(others)...);
+            return tailFuture.Then([head = move(head)](auto tf) mutable
+            {
+                return head.Then([tf = move(tf)](auto h) mutable
+                {
+                    return tuple_cat(make_tuple(move(h)), tf.Get());
+                });
+            });
+        }
+
+        inline Future<std::tuple<>> When_All_()
         {
             return Make_Ready_Future(std::tuple<>());
-        }
-
-        Future<When_Any_Result<std::tuple<>>> FutureHelper::When_Any()
-        {
-            using result_t = When_Any_Result<std::tuple<>>;
-
-            auto result = result_t();
-            result.index = static_cast<size_t>(-1);
-
-            return Make_Ready_Future<result_t>(std::move(result));
-        }
-
-        template<class TFuture>
-        TFuture FutureHelper::CreateFuture(const future_state<TFuture>& state)
-        {
-            auto future = TFuture();
-            future._state = state;
-            return future;
-        }
-
-        template<class R>
-        Shared_Future<R> BasicFuture<R>::Share()
-        {
-            auto state = ValidateState();
-            _state.reset();
-
-            return FutureHelper::CreateFuture<Shared_Future<R>>(state);
-        }
-
-        template<class R>
-        Future<R> BasicPromise<R>::Get_Future()
-        {
-            auto state = ValidateState();
-
-            if (!state->SetRetrieved())
-                throw CreateFutureError(future_errc::future_already_retrieved);
-
-            return FutureHelper::CreateFuture<Future<R>>(state);
-        }
-
-        template<class InputIterator>
-        decltype(auto) FutureHelper::When_Any(enable_if_iterator_t<InputIterator> begin, InputIterator end)
-        {
-            using namespace std;
-            using future_t = typename iterator_traits<InputIterator>::value_type;
-            using result_t = When_Any_Result<vector<future_t>>;
-
-            const auto noIdx = static_cast<size_t>(-1);
-            auto indexPromise = make_shared<Promise<size_t>>();
-            auto indexFuture = indexPromise->Get_Future();
-            vector<future_t> futures;
-
-            size_t index = 0;
-            for (auto iterator = begin; iterator != end; ++iterator)
-            {
-                futures.emplace_back(move(*iterator));
-
-                auto state = futures.back()._state;
-                state->SetCallback([indexPromise, index]()
-                {
-                    indexPromise->TrySetValue(index);
-                });
-
-                index++;
-            }
-
-            if (futures.empty())
-                indexPromise->SetValue(noIdx);
-
-            return indexFuture.Then(
-                [futures = std::move(futures)](auto f) mutable
-            {
-                result_t result;
-                result.index = f.Get();
-                result.futures = move(futures);
-
-                return result;
-            });
-        }
-
-        template<class... Futures>
-        decltype(auto) FutureHelper::When_Any(Futures&&... futures)
-        {
-            using namespace std;
-            using result_t = When_Any_Result<tuple<decay_t<Futures>...>>;
-            auto futuresSequence = make_tuple<std::decay_t<Futures>...>(std::forward<Futures>(futures)...);
-            auto indexPromise = make_shared<Promise<size_t>>();
-            auto indexFuture = indexPromise->Get_Future();
-
-            size_t index = 0;
-            detail::for_each(futuresSequence, [indexPromise, &index](auto& future) mutable
-            {
-                auto state = future._state;
-                state->SetCallback([indexPromise, index]()
-                {
-                    indexPromise->TrySetValue(index);
-                });
-
-                index++;
-            });
-
-            return indexFuture.Then(
-                [t = move(futuresSequence)](auto f) mutable
-            {
-                result_t result;
-                result.index = f.Get();
-                result.futures = move(t);
-
-                return move(result);
-            });
         }
     }
 }
