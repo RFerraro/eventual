@@ -189,16 +189,22 @@ if(Test-Path $coberturaFile)
 
     [xml]$coverage = Get-Content $coberturaFile
 
-    $runTime = [System.DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss zzz")
+    #timestamp from github
+    $gitTimestamp = (& git log -1 --format="%ci") | Get-Date
+    $runTime = $gitTimestamp.ToUniversalTime()
+    $midnight = $runTime.Date
     $gitInfo = Create-Git-Info
     $sourceFiles = @($coverage.coverage.packages | Read-Packages)
 
-    # encode a coveralls build number as: MMDD(AppVeyor BuildNumber)
-    # XX : number of months after 12/31/2015
-    # DD : Day of current month
+    # encode a coveralls build number as: MMDDmmm
+    # XX  : number of months after 12/31/2015
+    # DD  : Day of current month (utc)
+    # mmm : minutes after midnight utc / 2
+
     $epoch = New-Object System.DateTime -ArgumentList @(2015, 12, 31)
     $months = (($commitTime.Year - $epoch.Year) * 12) + ($commitTime.Month - $epoch.Month)
-    $serviceNumber = [System.String]::Format("{0:##}{1:00}{2:000}", $months, $commitTime.Day, $buildNumber)
+    $minutes = [Math]::Truncate((($runTime - $midnight).TotalMinutes) / 2)
+    $serviceNumber = [System.String]::Format("{0:##}{1:00}{2:000}", $months, $commitTime.Day, $minutes)
 
     $msg = [PSCustomObject]@{
         repo_token = "[Secure]"
@@ -209,7 +215,7 @@ if(Test-Path $coberturaFile)
         service_job_id = $buildJobID
         service_pull_request = $pullRequestNumber
         commit_sha = $commitID
-        run_at = $runTime
+        run_at = $runTime.ToString("yyyy-MM-dd HH:mm:ss zzz")
         git = $gitInfo
         source_files = $sourceFiles
     }
@@ -221,4 +227,8 @@ if(Test-Path $coberturaFile)
     $msg | Post-To_Coveralls
 
     Write-Host "Finished Posting to Coveralls"
+}
+else
+{
+    Write-Host "No code coverage to report."
 }

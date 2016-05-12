@@ -21,6 +21,7 @@ matrix:
                  - kalakris-cmake
               packages:
                  - clang-3.7
+                 - llvm-3.7
                  - libstdc++6
                  - cmake
       - compiler: clang
@@ -63,6 +64,7 @@ before_install:
   
 install:
    - pip install --user conan
+   - pip install --user cpp-coveralls
    - conan user
    - conan --version
    - conan install . -s compiler=$COMPILER -s build_type=$CONFIGURATION -s compiler.libcxx='libstdc++11' --build=missing
@@ -75,3 +77,6 @@ script:
    - cmake -DCMAKE_BUILD_TYPE=$CONFIGURATION .. 
    - cmake --build .
    - ./test/bin/Test
+
+after_success:
+   - if [[ "${CONFIGURATION}" = "Debug" ]]; then ../tools/travis/post_coverage_results.sh; fi
