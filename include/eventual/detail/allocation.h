@@ -25,31 +25,25 @@ namespace eventual
 
             typedef void(*cleanup_t)(memory_resource*);
 
-            //memory_resource() : _destroyed(false) { }
-
-            //virtual ~memory_resource() { _destroyed = true; }
+            virtual ~memory_resource() { }
 
             void* allocate(size_t bytes, size_t alignment = alignof(max_align_t))
             {
-                //assert(!_destroyed);
                 return do_allocate(bytes, alignment);
             }
 
             void deallocate(void* p, size_t bytes, size_t alignment = alignof(max_align_t))
             {
-                //assert(!_destroyed);
                 do_deallocate(p, bytes, alignment);
             }
 
             bool is_equal(const memory_resource& other) const
             {
-                //assert(!_destroyed);
                 return do_is_equal(other);
             }
 
             shared_resource clone() const
             {
-                //assert(!_destroyed);
                 return do_clone();
             }
 
@@ -314,6 +308,7 @@ namespace eventual
         {
 
         public:
+
             template<class Alloc, class = std::enable_if_t<!std::is_convertible<Alloc, strong_polymorphic_allocator>::value>>
             strong_polymorphic_allocator(const Alloc& alloc)
                 : strong_polymorphic_allocator(resource_adapter<Alloc>::create_shared(alloc))

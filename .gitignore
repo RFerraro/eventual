@@ -191,3 +191,4 @@ UpgradeLog*.htm
 
 # Microsoft Fakes
 FakesAssemblies/
+conanbuildinfo_*.cmake

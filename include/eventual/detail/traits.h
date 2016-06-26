@@ -27,8 +27,8 @@
 
 namespace eventual
 {
-    template <class R> class Future;
-    template <class R> class Shared_Future;
+    template <class R> class future;
+    template <class R> class shared_future;
     
     namespace detail
     {
@@ -45,10 +45,10 @@ namespace eventual
         struct is_future : std::false_type { };
 
         template<class R>
-        struct is_future<Future<R>> : std::true_type { };
+        struct is_future<future<R>> : std::true_type { };
 
         template<class R>
-        struct is_future<Shared_Future<R>> : std::true_type { };
+        struct is_future<shared_future<R>> : std::true_type { };
 
         template<class T>
         using enable_if_future_t = std::enable_if_t<is_future<T>::value, T>;

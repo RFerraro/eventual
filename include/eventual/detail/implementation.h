@@ -44,18 +44,18 @@
 
 namespace eventual
 {
-    template <class R> class Future;
-    template <class R> class Shared_Future;
+    template <class R> class future;
+    template <class R> class shared_future;
 
     template<class Sequence>
-    struct When_Any_Result;
+    struct when_any_result;
 
     namespace detail
     {
         template<class Future, class... Futures>
         static decltype(auto) When_All_(Future&& head, Futures&&... others);
 
-        static Future<std::tuple<>> When_All_();
+        static future<std::tuple<>> When_All_();
 
         template <class R> class BasicPromise;
         template <class R> class BasicFuture;
@@ -67,16 +67,26 @@ namespace eventual
         using future_status = std::future_status;
 
         template<class InputIterator>
-        using all_futures_vector = Future<std::vector<typename std::iterator_traits<InputIterator>::value_type>>;
+        using all_futures_vector = future<std::vector<typename std::iterator_traits<InputIterator>::value_type>>;
 
         template<class... Futures>
-        using all_futures_tuple = Future<std::tuple<std::decay_t<Futures>...>>;
+        using all_futures_tuple = future<std::tuple<std::decay_t<Futures>...>>;
 
         template<class InputIterator>
-        using any_future_result_vector = Future<When_Any_Result<std::vector<typename std::iterator_traits<InputIterator>::value_type>>>;
+        using any_future_result_vector = future<when_any_result<std::vector<typename std::iterator_traits<InputIterator>::value_type>>>;
 
         template<class... Futures>
-        using any_futures_result_tuple = Future<When_Any_Result<std::tuple<std::decay_t<Futures>...>>>;
+        using any_futures_result_tuple = future<when_any_result<std::tuple<std::decay_t<Futures>...>>>;
+
+        template<class T>
+        struct PlacementDestructor
+        {
+            void operator()(T* item) const
+            {
+                item->~T();
+                (void)item; // suppresses C4100 in VS2015
+            }
+        };
 
         class SimpleDelegate
         {
@@ -161,15 +171,7 @@ namespace eventual
             //todo: fine-tune this size
             using storage_t = std::aligned_union_t<32, SmallDelegate<Callable>, LargeDelegate<Callable>>;
 
-            struct PlacementDestructor
-            {
-                void operator()(Delegate* obj) const
-                {
-                    obj->~Delegate();
-                }
-            };
-
-            using object_pointer = std::unique_ptr<Delegate, PlacementDestructor>;
+            using delegate_pointer_t = std::unique_ptr<Delegate, PlacementDestructor<Delegate>>;
 
         public:
 
@@ -196,26 +198,26 @@ namespace eventual
         private:
 
             template<class T>
-            enable_if_size_is_less_than_or_eq_t<SmallDelegate<T>, storage_t, object_pointer>
+            enable_if_size_is_less_than_or_eq_t<SmallDelegate<T>, storage_t, delegate_pointer_t>
             Create(T&& functor, const polymorphic_allocator<SimpleDelegate>)
             {
                 static_assert(sizeof(SmallDelegate<T>) <= sizeof(storage_t), "Delegate does not fit in storage buffer.");
 
-                return object_pointer(new(&_data) SmallDelegate<T>(std::forward<T>(functor)));
+                return delegate_pointer_t(new(&_data) SmallDelegate<T>(std::forward<T>(functor)));
             }
 
             template<class T>
-            enable_if_size_is_greater_than_t<SmallDelegate<T>, storage_t, object_pointer>
+            enable_if_size_is_greater_than_t<SmallDelegate<T>, storage_t, delegate_pointer_t>
             Create(T&& functor, const polymorphic_allocator<SimpleDelegate>& alloc)
             {
                 static_assert(sizeof(SmallDelegate<T>) > sizeof(storage_t), "Incorrect delegate choosen.");
                 static_assert(sizeof(LargeDelegate<T>) <= sizeof(storage_t), "Pointer delegate does not fit in storage buffer.");
 
-                return object_pointer(new(&_data) LargeDelegate<T>(std::forward<T>(functor), polymorphic_allocator<T>(alloc)));
+                return delegate_pointer_t(new(&_data) LargeDelegate<T>(std::forward<T>(functor), polymorphic_allocator<T>(alloc)));
             }
             
             storage_t _data;
-            object_pointer _object;
+            delegate_pointer_t _object;
         };
 
         class FutureHelper
@@ -244,49 +246,47 @@ namespace eventual
         template<typename T>
         class ResultBlock
         {
+            using storage_t = std::aligned_storage_t<sizeof(T), alignof(T)>;
+            using result_pointer_t = std::unique_ptr<T, PlacementDestructor<T>>;
+
         public:
 
-            ResultBlock()
-                : _result(nullptr) { }
+            ResultBlock() { }
 
             ResultBlock(ResultBlock&&) = delete;
             ResultBlock(const ResultBlock&) = delete;
             ResultBlock& operator=(ResultBlock&&) = delete;
             ResultBlock& operator=(const ResultBlock&) = delete;
 
-            ~ResultBlock()
-            { 
-                // placement destruct
-                if (_result)
-                    _result->~T();
-            }
-
             template<typename R>
             void Set(R&& result)
             {
-                assert(_result == nullptr);
+                assert(!_result);
+
                 // placement new
-                _result = new(&_data) T(std::forward<R>(result));
+                _result.reset(new(&_data) T(std::forward<R>(result)));
             }
 
-            T Get()
+            T get()
             {
-                assert(_result != nullptr);
+                assert(_result);
+
                 return std::move(*_result);
             }
 
-            const T& Get() const
+            const T& get() const
             {
                 assert(_result != nullptr);
+
                 return *_result;
             }
 
         private:
-            std::aligned_storage_t<sizeof(T), alignof(T)> _data;
-            T* _result;
+            storage_t _data;
+            result_pointer_t _result;
         };
 
-        struct Tag { explicit Tag(int) { } };
+        struct StateTag { explicit StateTag(int) { } };
 
         template<typename T>
         class State
@@ -304,7 +304,7 @@ namespace eventual
         public:
 
             template<class Alloc>
-            State(const Tag&, const Alloc& alloc) :
+            State(const StateTag&, const Alloc& alloc) :
                 _retrieved(false),
                 _hasResult(false),
                 _result(),
@@ -325,7 +325,7 @@ namespace eventual
             template<class Alloc, class = typename enable_if_not_same<State, Alloc>::type>
             static std::shared_ptr<State> AllocState(const Alloc& alloc)
             {
-                auto state = std::allocate_shared<State>(alloc, Tag(0), alloc);
+                auto state = std::allocate_shared<State>(alloc, StateTag(0), alloc);
 
                 state->SetNotifier(state);
 
@@ -337,7 +337,7 @@ namespace eventual
             State& operator=(State&&) = delete;
             State& operator=(const State&) = delete;
 
-            allocator_t Get_Allocator() const
+            const allocator_t& Get_Allocator() const
             {
                 return _allocator;
             }
@@ -431,7 +431,7 @@ namespace eventual
 
                 Wait(lock);
                 CheckException();
-                return _result.Get();
+                return _result.get();
             }
 
             const T& GetResult() const
@@ -440,7 +440,7 @@ namespace eventual
 
                 Wait(lock);
                 CheckException();
-                return _result.Get();
+                return _result.get();
             }
 
             template<class TValue>
@@ -589,26 +589,26 @@ namespace eventual
         public:
 
             template<class Alloc>
-            CompositeState(const typename Tag& tag, const Alloc& alloc)
+            CompositeState(const typename StateTag& tag, const Alloc& alloc)
                 : TPrimaryState(tag, alloc), TSecondaryState(tag, alloc)
             {
-                TPrimaryState::SetCallback([this]() mutable
+                SetCallback([this]() mutable
                 {
-                    if (TPrimaryState::HasException())
+                    if (HasException())
                     {
-                        TSecondaryState::SetException(TPrimaryState::GetException());
+                        TSecondaryState::SetException(GetException());
                         return;
                     }
 
-                    auto innerFuture = TPrimaryState::GetResult();
-                    if (!innerFuture.Valid())
+                    auto innerFuture = GetResult();
+                    if (!innerFuture.valid())
                     {
                         TSecondaryState::SetException(CreateFutureExceptionPtr(future_errc::broken_promise));
                         return;
                     }
 
                     auto futureState = TSecondaryState::GetNotifier();
-                    innerFuture.Then([futureState = std::move(futureState)](auto future)
+                    innerFuture.then([futureState = std::move(futureState)](auto future)
                     {
                         FutureHelper::SetResultFromFuture(*futureState, future);
                     });
@@ -665,7 +665,7 @@ namespace eventual
             template<class Alloc, class = typename enable_if_not_same<CompositeState, Alloc>::type>
             static std::shared_ptr<CompositeState> AllocState(const Alloc& alloc)
             {
-                auto state = std::allocate_shared<CompositeState>(alloc, Tag(0), alloc);
+                auto state = std::allocate_shared<CompositeState>(alloc, StateTag(0), alloc);
 
                 state->SetNotifier(state);
 
@@ -767,8 +767,14 @@ namespace eventual
 
             void Reset()
             {
-                // todo: save allocator somewhere?
-                _state = StateType::MakeState();
+                auto state = _state;
+                if (!state)
+                    return;
+
+                const auto& allocator = state->Get_Allocator();
+                auto newState = StateType::AllocState(allocator);
+
+                std::swap(_state, newState);
             }
 
             bool Valid() const noexcept
@@ -831,20 +837,14 @@ namespace eventual
                 return *this;
             }
 
-            void Swap(BasicTask& other) noexcept
-            {
-                Base::Swap(other);
-                std::swap(_task, other._task);
-            }
-
-            void Reset()
+            void reset()
             {
                 Base::ValidateState();
 
                 Base::Reset();
             }
 
-            bool Valid() { return Base::Valid(); }
+            bool valid() const { return Base::Valid(); }
 
             void operator()(ArgTypes... args)
             {
@@ -865,7 +865,7 @@ namespace eventual
                 }
             }
 
-            void Make_Ready_At_Thread_Exit(ArgTypes... args)
+            void make_ready_at_thread_exit(ArgTypes... args)
             {
                 try
                 {
@@ -884,11 +884,20 @@ namespace eventual
                 }
             }
 
+        protected:
+
+            void Swap(BasicTask& other) noexcept
+            {
+                Base::Swap(other);
+                std::swap(_task, other._task);
+            }
+
         private:
 
             TFunctor _task;
         };
 
+        // todo: eliminate this specialization...
         template<class TFunctor, class... ArgTypes>
         class BasicTask<TFunctor, void, ArgTypes...> : public BasicPromise<void>
         {
@@ -919,20 +928,14 @@ namespace eventual
                 return *this;
             }
 
-            void Swap(BasicTask& other) noexcept
-            {
-                Base::Swap(other);
-                std::swap(_task, other._task);
-            }
-
-            void Reset()
+            void reset()
             {
                 Base::ValidateState();
 
                 Base::Reset();
             }
 
-            bool Valid() { return Base::Valid(); }
+            bool valid() const { return Base::Valid(); }
 
             void operator()(ArgTypes... args)
             {
@@ -954,7 +957,7 @@ namespace eventual
                 }
             }
 
-            void Make_Ready_At_Thread_Exit(ArgTypes... args)
+            void make_ready_at_thread_exit(ArgTypes... args)
             {
                 try
                 {
@@ -972,6 +975,14 @@ namespace eventual
                 {
                     Base::SetExceptionAtThreadExit(std::current_exception());
                 }
+            }
+
+        protected:
+
+            void Swap(BasicTask& other) noexcept
+            {
+                Base::Swap(other);
+                std::swap(_task, other._task);
             }
 
         private:
@@ -999,24 +1010,24 @@ namespace eventual
             BasicFuture& operator=(const BasicFuture& rhs) = default;
             BasicFuture& operator=(BasicFuture&& other) noexcept = default;
 
-            bool Valid() const noexcept { return _state ? true : false; }
-            bool Is_Ready() const noexcept { return (_state && _state->Is_Ready()); }
+            bool valid() const noexcept { return _state ? true : false; }
+            bool is_ready() const noexcept { return (_state && _state->Is_Ready()); }
 
-            void Wait() const
+            void wait() const
             {
                 auto state = ValidateState();
                 state->Wait();
             }
 
             template <class Rep, class Period>
-            future_status Wait_For(const std::chrono::duration<Rep, Period>& rel_time) const
+            future_status wait_for(const std::chrono::duration<Rep, Period>& rel_time) const
             {
                 auto state = ValidateState();
                 return state->Wait_For(rel_time) ? future_status::ready : future_status::timeout;
             }
 
             template <class Clock, class Duration>
-            future_status Wait_Until(const std::chrono::time_point<Clock, Duration>& abs_time) const
+            future_status wait_until(const std::chrono::time_point<Clock, Duration>& abs_time) const
             {
                 auto state = ValidateState();
                 return state->Wait_Until(abs_time) ? future_status::ready : future_status::timeout;
