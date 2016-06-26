@@ -121,7 +121,7 @@ TYPED_TEST(PromiseTest, IsSwapable)
    promise<TypeParam> moved(std::move(target)); // transfers state.
 
    // Act
-   target.Swap(moved); // transfers back
+   target.swap(moved); // transfers back
 
    // Assert
    EXPECT_NO_THROW(target.get_future()) << "Swap did not transfer a valid state.";

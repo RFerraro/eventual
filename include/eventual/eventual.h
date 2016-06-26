@@ -39,6 +39,9 @@ namespace eventual
     template<class R>
     class promise;
 
+    template <class> 
+    class packaged_task; // undefined
+
     template<class Sequence>
     struct when_any_result
     {
@@ -51,8 +54,8 @@ namespace eventual
     {
         using Base = detail::BasicFuture<RType>;
         using SharedState = typename Base::SharedState;
-        friend class detail::FutureHelper;
-        friend class promise<RType>;
+        
+        friend class detail::FutureFactory;
 
     public:
         future() noexcept = default;
@@ -77,6 +80,11 @@ namespace eventual
         shared_future<RType> share();
 
     private:
+
+        template<class TPromise>
+        future(const TPromise& promise, detail::enable_if_not_same_t<future, TPromise, int> = 0)
+            : Base(promise) { }
+
         future(SharedState&& other) : Base(std::forward<SharedState>(other)) { }
     };
 
@@ -85,8 +93,8 @@ namespace eventual
     {
         using Base = detail::BasicFuture<RType&>;
         using SharedState = typename Base::SharedState;
-        friend class detail::FutureHelper;
-        friend class promise<RType&>;
+        
+        friend class detail::FutureFactory;
 
     public:
         future() noexcept = default;
@@ -111,6 +119,12 @@ namespace eventual
         shared_future<RType&> share();
 
     private:
+
+        template<class TPromise>
+        future(const TPromise& promise, detail::enable_if_not_same_t<future, TPromise, int> = 0)
+            : Base(promise)
+        { }
+
         future(SharedState&& other) : Base(std::forward<SharedState>(other)) { }
     };
 
@@ -119,8 +133,8 @@ namespace eventual
     {
         using Base = detail::BasicFuture<void>;
         using SharedState = typename Base::SharedState;
-        friend class detail::FutureHelper;
-        friend class promise<void>;
+        
+        friend class detail::FutureFactory;
 
     public:
         future() noexcept = default;
@@ -145,6 +159,12 @@ namespace eventual
         shared_future<void> share();
 
     private:
+
+        template<class TPromise>
+        future(const TPromise& promise, detail::enable_if_not_same_t<future, TPromise, int> = 0)
+            : Base(promise)
+        { }
+
         future(SharedState&& other) : Base(std::forward<SharedState>(other)) { }
     };
 
@@ -152,7 +172,7 @@ namespace eventual
     class promise : public detail::BasicPromise<R>
     {
         using Base = detail::BasicPromise<R>;
-        friend class detail::FutureHelper;
+        using Factory = detail::FutureFactory;
 
     public:
         promise() = default;
@@ -165,23 +185,19 @@ namespace eventual
         promise& operator=(const promise& rhs) = delete;
         promise& operator=(promise&& other) noexcept = default;
 
-        void swap(promise& other) noexcept { Base::Swap(other); }
-
-        future<R> get_future() { return future<R>(Base::CopyState()); }
+        void swap(promise& other) noexcept { Base::swap(other); }
 
         void set_value(const R& value) { Base::SetValue(value); }
         void set_value(R&& value) { Base::SetValue(std::forward<R>(value)); }
         void set_value_at_thread_exit(const R& value) { Base::SetValueAtThreadExit(value); }
         void set_value_at_thread_exit(R&& value) { Base::SetValueAtThreadExit(std::forward<R>(value)); }
-        void set_exception(std::exception_ptr exceptionPtr) { Base::SetException(exceptionPtr); }
-        void set_exception_at_thread_exit(std::exception_ptr exceptionPtr) { Base::SetExceptionAtThreadExit(exceptionPtr); }
     };
 
     template<class R>
     class promise<R&> : public detail::BasicPromise<R&>
     {
         using Base = detail::BasicPromise<R&>;
-        friend class detail::FutureHelper;
+        using Factory = detail::FutureFactory;
 
     public:
         promise() = default;
@@ -194,21 +210,17 @@ namespace eventual
         promise& operator=(const promise& rhs) = delete;
         promise& operator=(promise&& other) noexcept = default;
 
-        void swap(promise& other) noexcept { Base::Swap(other); }
-
-        future<R&> get_future() { return future<R&>(Base::CopyState()); }
+        void swap(promise& other) noexcept { Base::swap(other); }
 
         void set_value(R& value) { Base::SetValue(value); }
         void set_value_at_thread_exit(R& value) { Base::SetValueAtThreadExit(value); }
-        void set_exception(std::exception_ptr exceptionPtr) { Base::SetException(exceptionPtr); }
-        void set_exception_at_thread_exit(std::exception_ptr exceptionPtr) { Base::SetExceptionAtThreadExit(exceptionPtr); }
     };
 
     template<>
     class promise<void> : public detail::BasicPromise<void>
     {
         using Base = detail::BasicPromise<void>;
-        friend class detail::FutureHelper;
+        using Factory = detail::FutureFactory;
 
     public:
         promise() = default;
@@ -221,14 +233,10 @@ namespace eventual
         promise& operator=(const promise& rhs) = delete;
         promise& operator=(promise&& other) noexcept = default;
 
-        void swap(promise& other) noexcept { Base::Swap(other); }
-
-        future<void> get_future() { return future<void>(Base::CopyState()); }
+        void swap(promise& other) noexcept { Base::swap(other); }
 
         void set_value() { Base::SetValue(detail::Unit()); }
         void set_value_at_thread_exit() { Base::SetValueAtThreadExit(detail::Unit()); }
-        void set_exception(std::exception_ptr exceptionPtr) { Base::SetException(exceptionPtr); }
-        void set_exception_at_thread_exit(std::exception_ptr exceptionPtr) { Base::SetExceptionAtThreadExit(exceptionPtr); }
     };
 
     template<class R>
@@ -236,7 +244,6 @@ namespace eventual
     {
         using Base = detail::BasicFuture<R>;
         using SharedState = typename Base::SharedState;
-        friend class future<R>;
 
     public:
 
@@ -269,7 +276,6 @@ namespace eventual
     {
         using Base = detail::BasicFuture<R&>;
         using SharedState = typename Base::SharedState;
-        friend class future<R&>;
 
     public:
 
@@ -302,7 +308,6 @@ namespace eventual
     {
         using Base = detail::BasicFuture<void>;
         using SharedState = typename Base::SharedState;
-        friend class future<void>;
 
     public:
 
@@ -331,12 +336,11 @@ namespace eventual
         shared_future(SharedState&& other) : Base(std::forward<SharedState>(other)) { }
     };
 
-    template <class> class packaged_task; // undefined
-
     template<class R, class... ArgTypes>
     class packaged_task<R(ArgTypes...)> : public detail::BasicTask<std::function<R(ArgTypes...)>, R, ArgTypes...>
     {
         using Base = detail::BasicTask<std::function<R(ArgTypes...)>, R, ArgTypes...>;
+        using Factory = detail::FutureFactory;
 
     public:
         packaged_task() noexcept = default;
@@ -356,26 +360,24 @@ namespace eventual
         packaged_task& operator=(const packaged_task&) = delete;
         packaged_task& operator=(packaged_task&&) noexcept = default;
 
-        void swap(packaged_task& other) { Base::Swap(other); }
-
-        future<R> get_future() { return detail::FutureHelper::Get_Future(*this); }
+        void swap(packaged_task& other) { Base::swap(other); }
     };
 
     template<class R>
     shared_future<R> future<R>::share()
     {
-        return shared_future<R>(Base::MoveState());
+        return Base::Share(std::move(*this));
     }
 
     template<class R>
     shared_future<R&> future<R&>::share()
     {
-        return shared_future<R&>(Base::MoveState());
+        return Base::Share(std::move(*this));
     }
 
     inline shared_future<void> future<void>::share()
     {
-        return shared_future<void>(Base::MoveState());
+        return Base::Share(std::move(*this));
     }
 
     template<class T>
@@ -554,12 +556,48 @@ namespace eventual
 {
     namespace detail
     {
-        template<class TUnit>
-        decltype(auto) FutureHelper::Get_Future(const BasicPromise<TUnit>& promise)
+        template<class TResult>
+        future<TResult> FutureFactory::Create(const CommonPromise<TResult>& promise)
         {
-            return future<type_from_unit_t<TUnit>>(promise.CopyState());
+            return future<TResult>(promise);
         }
 
+        template<class R>
+        shared_future<R> detail::BasicFuture<R>::Share(future<R>&& future)
+        {
+            future.CheckState();
+            return shared_future<R>(std::forward<eventual::future<R>>(future));
+        }
+
+        template<class R>
+        template<class TContinuation, class TFuture>
+        decltype(auto) detail::BasicFuture<R>::ThenImpl(TContinuation&& continuation, TFuture&& future)
+        {
+            using namespace std;
+            using task_t = get_continuation_task_t<TFuture, TContinuation>;
+
+            auto current = forward<TFuture>(future);
+            auto state = current.ValidateState();
+            auto allocator = state->Get_Allocator();
+
+            task_t task(allocator_arg_t(), allocator, forward<TContinuation>(continuation));
+            auto taskFuture = GetUnwrappedFuture(task);
+
+            state->SetCallback(
+                [
+                    task = move(task),
+                    current = move(current)
+                ]() mutable
+            {
+                task(move(current));
+            });
+
+            return taskFuture;
+        }
+
+        template<class R>
+        future<R> detail::CommonPromise<R>::get_future() { return FutureFactory::Create(*this); }
+        
         template<class Future, class... Futures>
         decltype(auto) When_All_(Future&& head, Futures&&... others)
         {

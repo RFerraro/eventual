@@ -57,6 +57,7 @@ namespace eventual
 
         static future<std::tuple<>> When_All_();
 
+        template <class R> class CommonPromise;
         template <class R> class BasicPromise;
         template <class R> class BasicFuture;
 
@@ -77,6 +78,30 @@ namespace eventual
 
         template<class... Futures>
         using any_futures_result_tuple = future<when_any_result<std::tuple<std::decay_t<Futures>...>>>;
+
+        class FutureFactory
+        {
+        public:
+            template<class TResult>
+            static future<TResult> Create(const CommonPromise<TResult>& promise);
+        };
+
+        class FutureHelper
+        {
+        public:
+
+            template<class TResult, class T>
+            static void SetCallback(BasicFuture<TResult>& future, T&& callback);
+
+            template<class TResult, class T>
+            static bool TrySetValue(BasicPromise<TResult>& promise, const T& value);
+
+            template<class TResult>
+            static decltype(auto) GetState(BasicFuture<TResult>& future);
+
+            template<class TResult>
+            static decltype(auto) GetResult(BasicFuture<TResult>& future);
+        };
 
         template<class T>
         struct PlacementDestructor
@@ -169,7 +194,7 @@ namespace eventual
             };
             
             //todo: fine-tune this size
-            using storage_t = std::aligned_union_t<32, SmallDelegate<Callable>, LargeDelegate<Callable>>;
+            using storage_t = aligned_union_t<32, SmallDelegate<Callable>, LargeDelegate<Callable>>;
 
             using delegate_pointer_t = std::unique_ptr<Delegate, PlacementDestructor<Delegate>>;
 
@@ -218,29 +243,6 @@ namespace eventual
             
             storage_t _data;
             delegate_pointer_t _object;
-        };
-
-        class FutureHelper
-        {
-        public:
-
-            template<class TUnit>
-            static decltype(auto) Get_Future(const BasicPromise<TUnit>& promise);
-
-            template<class TFuture, class T>
-            static void SetCallback(TFuture& future, T&& callback)
-            {
-                future._state->SetCallback(std::forward<T>(callback));
-            }
-
-            template<class TPromise, class T>
-            static bool TrySetValue(TPromise& promise, const T& value)
-            {
-                return promise.TrySetValue(value);
-            }
-
-            template<class TState, class T>
-            static void SetResultFromFuture(TState& state, BasicFuture<T>& future);
         };
 
         template<typename T>
@@ -589,7 +591,7 @@ namespace eventual
         public:
 
             template<class Alloc>
-            CompositeState(const typename StateTag& tag, const Alloc& alloc)
+            CompositeState(const StateTag& tag, const Alloc& alloc)
                 : TPrimaryState(tag, alloc), TSecondaryState(tag, alloc)
             {
                 SetCallback([this]() mutable
@@ -610,7 +612,7 @@ namespace eventual
                     auto futureState = TSecondaryState::GetNotifier();
                     innerFuture.then([futureState = std::move(futureState)](auto future)
                     {
-                        FutureHelper::SetResultFromFuture(*futureState, future);
+                        CompositeState::SetResultFromFuture(*futureState, future);
                     });
                 });
             }
@@ -625,6 +627,10 @@ namespace eventual
             {
                 return TPrimaryState::Get_Allocator();
             }
+
+            bool HasResult() { return TPrimaryState::HasResult(); }
+
+            bool SetRetrieved() { return TPrimaryState::SetRetrieved(); }
 
             bool HasException()
             {
@@ -684,42 +690,52 @@ namespace eventual
             {
                 return TPrimaryState::GetNotifier();
             }
+
+        private:
+            template<class TState, class T>
+            static void SetResultFromFuture(TState& state, BasicFuture<T>& future);
         };
 
         template<class R>
-        class BasicPromise
+        class CommonPromise
         {
+            friend class BasicFuture<R>;
+
+        protected:
             using StateType = get_state_t<R>;
             using SharedState = get_shared_state_t<R>;
-            friend class FutureHelper;
-        public:
-            BasicPromise() : _state(StateType::MakeState()) { }
-            BasicPromise(const BasicPromise& other) = delete;
-            BasicPromise(BasicPromise&& other) noexcept = default;
 
-            BasicPromise(SharedState state) : _state(state) { }
+        public:
+
+            CommonPromise() : _state(StateType::MakeState()) { }
+            CommonPromise(const CommonPromise& other) = delete;
+            CommonPromise(CommonPromise&& other) noexcept = default;
+
+            CommonPromise(SharedState state) : _state(state) { }
 
             template<class Alloc>
-            BasicPromise(std::allocator_arg_t, const Alloc& alloc) :
+            CommonPromise(std::allocator_arg_t, const Alloc& alloc) :
                 _state(StateType::AllocState(alloc))
             { }
 
-            virtual ~BasicPromise() noexcept
+            ~CommonPromise() noexcept
             {
                 auto state = _state;
-                if (!state || state->State::HasResult())
+                if (!state || state->HasResult())
                     return;
 
-                state->State::SetException(CreateFutureExceptionPtr(future_errc::broken_promise));
+                state->SetException(CreateFutureExceptionPtr(future_errc::broken_promise));
             }
 
-            BasicPromise& operator=(const BasicPromise& rhs) = delete;
-            BasicPromise& operator=(BasicPromise&& other) noexcept = default;
+            CommonPromise& operator=(const CommonPromise& rhs) = delete;
+            CommonPromise& operator=(CommonPromise&& other) noexcept = default;
 
-            void Swap(BasicPromise& other) noexcept
+            void swap(CommonPromise& other) noexcept
             {
                 _state.swap(other._state);
             }
+
+            future<R> get_future();
 
         protected:
 
@@ -728,7 +744,7 @@ namespace eventual
             {
                 auto state = ValidateState();
 
-                if (!state->State::SetResult(std::forward<TValue>(value)))
+                if (!state->SetResult(std::forward<TValue>(value)))
                     throw CreateFutureError(future_errc::promise_already_satisfied);
             }
 
@@ -737,7 +753,7 @@ namespace eventual
             {
                 auto state = ValidateState();
 
-                if (!state->State::SetResultAtThreadExit(std::forward<TValue>(value)))
+                if (!state->SetResultAtThreadExit(std::forward<TValue>(value)))
                     throw CreateFutureError(future_errc::promise_already_satisfied);
             }
 
@@ -745,7 +761,7 @@ namespace eventual
             {
                 auto state = ValidateState();
 
-                if (!state->State::SetException(exceptionPtr))
+                if (!state->SetException(exceptionPtr))
                     throw CreateFutureError(future_errc::promise_already_satisfied);
             }
 
@@ -753,7 +769,7 @@ namespace eventual
             {
                 auto state = ValidateState();
 
-                if (!state->State::SetExceptionAtThreadExit(exceptionPtr))
+                if (!state->SetExceptionAtThreadExit(exceptionPtr))
                     throw CreateFutureError(future_errc::promise_already_satisfied);
             }
 
@@ -762,14 +778,12 @@ namespace eventual
             {
                 auto state = ValidateState();
 
-                return state->State::SetResult(std::forward<TValue>(value));
+                return state->SetResult(std::forward<TValue>(value));
             }
 
             void Reset()
             {
-                auto state = _state;
-                if (!state)
-                    return;
+                auto state = ValidateState();
 
                 const auto& allocator = state->Get_Allocator();
                 auto newState = StateType::AllocState(allocator);
@@ -796,7 +810,7 @@ namespace eventual
             {
                 auto state = ValidateState();
 
-                if (!state->State::SetRetrieved())
+                if (!state->SetRetrieved())
                     throw CreateFutureError(future_errc::future_already_retrieved);
 
                 return state;
@@ -807,101 +821,62 @@ namespace eventual
             SharedState _state;
         };
 
-        template<class TFunctor, class R, class... ArgTypes>
-        class BasicTask : public BasicPromise<R>
+        template<class R>
+        class BasicPromise : public CommonPromise<R>
         {
-            using Base = detail::BasicPromise<R>;
+            using Base = CommonPromise<R>;
+            using SharedState = typename Base::SharedState;
+
+            friend class FutureHelper;
+            friend class BasicFuture<R>;
 
         public:
+            BasicPromise() { }
+            BasicPromise(const BasicPromise& other) = delete;
+            BasicPromise(BasicPromise&& other) noexcept = default;
 
-            BasicTask() noexcept : Base(nullptr) { }
-            BasicTask(const BasicTask&) = delete;
-            BasicTask(BasicTask&& other) noexcept
-                : Base(std::forward<BasicTask>(other)), _task(std::move(other._task))
-            { }
+            BasicPromise(SharedState state) 
+                : Base(state) { }
 
-            template<class F, class Allocator, class = enable_if_not_same<BasicTask, F>::type>
-            BasicTask(std::allocator_arg_t arg, const Allocator& alloc, F&& task)
-                : Base(arg, alloc), _task(CreateFunctor<TFunctor>(alloc, std::forward<F>(task)))
-            { }
+            template<class Alloc>
+            BasicPromise(std::allocator_arg_t arg, const Alloc& alloc) 
+                : Base(arg, alloc) { }
 
-            template<class F, class = enable_if_not_same<BasicTask, F>::type>
-            BasicTask(F&& task)
-                : Base(), _task(std::forward<F>(task))
-            { }
+            BasicPromise& operator=(const BasicPromise& rhs) = delete;
+            BasicPromise& operator=(BasicPromise&& other) noexcept = default;
 
-            BasicTask& operator=(BasicTask&& other) noexcept
-            {
-                _task = std::move(other._task);
-                Base::operator=(std::forward<BasicTask>(other));
-                return *this;
-            }
-
-            void reset()
-            {
-                Base::ValidateState();
-
-                Base::Reset();
-            }
-
-            bool valid() const { return Base::Valid(); }
-
-            void operator()(ArgTypes... args)
-            {
-                try
-                {
-                    Base::SetValue(_task(std::forward<ArgTypes>(args)...));
-                }
-                catch (const future_error& error)
-                {
-                    if (error.code() != future_errc::promise_already_satisfied)
-                        Base::SetException(std::current_exception());
-                    else
-                        throw;
-                }
-                catch (...)
-                {
-                    Base::SetException(std::current_exception());
-                }
-            }
-
-            void make_ready_at_thread_exit(ArgTypes... args)
-            {
-                try
-                {
-                    Base::SetValueAtThreadExit(_task(std::forward<ArgTypes>(args)...));
-                }
-                catch (const future_error& error)
-                {
-                    if (error.code() != future_errc::promise_already_satisfied)
-                        Base::SetExceptionAtThreadExit(std::current_exception());
-                    else
-                        throw;
-                }
-                catch (...)
-                {
-                    Base::SetExceptionAtThreadExit(std::current_exception());
-                }
-            }
+            void set_exception(std::exception_ptr exceptionPtr) { Base::SetException(exceptionPtr); }
+            void set_exception_at_thread_exit(std::exception_ptr exceptionPtr) { Base::SetExceptionAtThreadExit(exceptionPtr); }
 
         protected:
 
-            void Swap(BasicTask& other) noexcept
+            template<class TValue>
+            void SetValue(TValue&& value)
             {
-                Base::Swap(other);
-                std::swap(_task, other._task);
+                Base::SetValue(std::forward<TValue>(value));
             }
 
-        private:
+            template<class TValue>
+            void SetValueAtThreadExit(TValue&& value)
+            {
+                Base::SetValueAtThreadExit(std::forward<TValue>(value));
+            }
 
-            TFunctor _task;
+            void SetException(std::exception_ptr exceptionPtr)
+            {
+                Base::SetException(exceptionPtr);
+            }
+
+            void SetExceptionAtThreadExit(std::exception_ptr exceptionPtr)
+            {
+                Base::SetExceptionAtThreadExit(exceptionPtr);
+            }
         };
 
-        // todo: eliminate this specialization...
-        template<class TFunctor, class... ArgTypes>
-        class BasicTask<TFunctor, void, ArgTypes...> : public BasicPromise<void>
+        template<class TFunctor, class R, class... ArgTypes>
+        class BasicTask : public CommonPromise<R>
         {
-            using Base = detail::BasicPromise<void>;
+            using Base = CommonPromise<R>;
 
         public:
 
@@ -911,12 +886,12 @@ namespace eventual
                 : Base(std::forward<BasicTask>(other)), _task(std::move(other._task))
             { }
 
-            template<class F, class Allocator, class = enable_if_not_same<BasicTask, F>::type>
+            template<class F, class Allocator, class = typename enable_if_not_same<BasicTask, F>::type>
             BasicTask(std::allocator_arg_t arg, const Allocator& alloc, F&& task)
                 : Base(arg, alloc), _task(CreateFunctor<TFunctor>(alloc, std::forward<F>(task)))
             { }
 
-            template<class F, class = enable_if_not_same<BasicTask, F>::type>
+            template<class F, class = typename enable_if_not_same<BasicTask, F>::type>
             BasicTask(F&& task)
                 : Base(), _task(std::forward<F>(task))
             { }
@@ -930,8 +905,6 @@ namespace eventual
 
             void reset()
             {
-                Base::ValidateState();
-
                 Base::Reset();
             }
 
@@ -941,8 +914,7 @@ namespace eventual
             {
                 try
                 {
-                    _task(std::forward<ArgTypes>(args)...);
-                    Base::SetValue(Unit());
+                    Base::SetValue(ExecuteTask<R>(std::forward<ArgTypes>(args)...));
                 }
                 catch (const future_error& error)
                 {
@@ -961,8 +933,7 @@ namespace eventual
             {
                 try
                 {
-                    _task(std::forward<ArgTypes>(args)...);
-                    Base::SetValueAtThreadExit(Unit());
+                    Base::SetValueAtThreadExit(ExecuteTask<R>(std::forward<ArgTypes>(args)...));
                 }
                 catch (const future_error& error)
                 {
@@ -977,15 +948,28 @@ namespace eventual
                 }
             }
 
-        protected:
-
-            void Swap(BasicTask& other) noexcept
+            void swap(BasicTask& other) noexcept
             {
-                Base::Swap(other);
+                Base::swap(other);
                 std::swap(_task, other._task);
             }
 
         private:
+
+            template<class TResult>
+            std::enable_if_t<!std::is_void<TResult>::value, TResult>
+            ExecuteTask(ArgTypes... args)
+            {
+                return _task(std::forward<ArgTypes>(args)...);
+            }
+
+            template<class TResult>
+            std::enable_if_t<std::is_void<TResult>::value, Unit>
+            ExecuteTask(ArgTypes... args)
+            {
+                _task(std::forward<ArgTypes>(args)...);
+                return Unit();
+            }
 
             TFunctor _task;
         };
@@ -1005,7 +989,11 @@ namespace eventual
             BasicFuture(const BasicFuture& other) = default;
             BasicFuture(BasicFuture&& other) noexcept = default;
 
-            BasicFuture(SharedState&& state) noexcept : _state(std::forward<SharedState>(state)) { }
+            BasicFuture(const CommonPromise<R>& promise)
+                : BasicFuture(promise.CopyState()) { }
+
+            BasicFuture(SharedState&& state) noexcept 
+                : _state(std::forward<SharedState>(state)) { }
 
             BasicFuture& operator=(const BasicFuture& rhs) = default;
             BasicFuture& operator=(BasicFuture&& other) noexcept = default;
@@ -1035,8 +1023,8 @@ namespace eventual
 
         protected:
 
-            template<template<typename> class NestedFuture, class T>
-            BasicFuture(BasicFuture<NestedFuture<T>>&& other) noexcept
+            template<template<typename> class NestedFuture>
+            BasicFuture(BasicFuture<NestedFuture<R>>&& other) noexcept
                 : BasicFuture(std::move(other._state))
             { }
 
@@ -1073,6 +1061,16 @@ namespace eventual
                 return state;
             }
 
+            void CheckState()
+            {
+                auto state = _state;
+
+                if (!state)
+                    throw CreateFutureError(future_errc::no_state);
+            }
+
+            static shared_future<R> Share(future<R>&& future);
+
             template<class TContinuation, class TFuture>
             static decltype(auto) ThenMove(TContinuation&& continuation, TFuture& future)
             {
@@ -1086,29 +1084,7 @@ namespace eventual
             }
 
             template<class TContinuation, class TFuture>
-            static decltype(auto) ThenImpl(TContinuation&& continuation, TFuture&& future)
-            {
-                using namespace std;
-                using task_t = get_continuation_task_t<TFuture, TContinuation>;
-                
-                auto current = forward<TFuture>(future);
-                auto state = current.ValidateState();
-                auto allocator = state->Get_Allocator();
-
-                task_t task(allocator_arg_t(), allocator, forward<TContinuation>(continuation));
-                auto taskFuture = GetUnwrappedFuture(task);
-
-                state->SetCallback(
-                    [
-                        task = move(task),
-                        current = move(current)
-                    ]() mutable
-                {
-                    task(move(current));
-                });
-
-                return taskFuture;
-            }
+            static decltype(auto) ThenImpl(TContinuation&& continuation, TFuture&& future);
 
         private:
 
@@ -1118,9 +1094,9 @@ namespace eventual
             }
 
             template<class TResult>
-            static decltype(auto) GetUnwrappedFuture(const BasicPromise<TResult>& promise)
+            static decltype(auto) GetUnwrappedFuture(const CommonPromise<TResult>& promise)
             {
-                return Unwrap(FutureHelper::Get_Future(promise));
+                return Unwrap(FutureFactory::Create(promise));
             }
 
             template<typename T, template<typename> class TOuter, template<typename> class TInner>
@@ -1143,17 +1119,42 @@ namespace eventual
             SharedState _state;
         };
 
-        template<class TState, class T>
-        void FutureHelper::SetResultFromFuture(TState& state, BasicFuture<T>& future)
+        template<class TResult, class T>
+        void FutureHelper::SetCallback(BasicFuture<TResult>& future, T&& callback)
         {
-            auto innerState = future.GetState();
+            future._state->SetCallback(std::forward<T>(callback));
+        }
+
+        template<class TResult, class T>
+        bool FutureHelper::TrySetValue(BasicPromise<TResult>& promise, const T& value)
+        {
+            return promise.TrySetValue(value);
+        }
+
+        template<class TResult>
+        decltype(auto) FutureHelper::GetState(BasicFuture<TResult>& future)
+        {
+            return future.GetState();
+        }
+
+        template<class TResult>
+        decltype(auto) FutureHelper::GetResult(BasicFuture<TResult>& future)
+        {
+            return future.GetResult();
+        }
+
+        template<class TPrimaryState, class TSecondaryState>
+        template<class TState, class T>
+        void CompositeState<TPrimaryState, TSecondaryState>::SetResultFromFuture(TState& state, BasicFuture<T>& future)
+        {
+            auto innerState = FutureHelper::GetState(future);
             if (innerState->HasException())
             {
                 state.SetException(innerState->GetException());
                 return;
             }
 
-            state.SetResult(future.GetResult());
+            state.SetResult(FutureHelper::GetResult(future));
         }
     }
 }

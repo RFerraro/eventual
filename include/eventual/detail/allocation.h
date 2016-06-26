@@ -5,6 +5,7 @@
 #include <type_traits>
 #include <cassert>
 #include <atomic>
+#include <cstddef>
 
 namespace eventual
 {
@@ -23,8 +24,6 @@ namespace eventual
 
         public:
 
-            typedef void(*cleanup_t)(memory_resource*);
-
             virtual ~memory_resource() { }
 
             void* allocate(size_t bytes, size_t alignment = alignof(max_align_t))
@@ -42,19 +41,10 @@ namespace eventual
                 return do_is_equal(other);
             }
 
-            shared_resource clone() const
-            {
-                return do_clone();
-            }
-
         protected:
             virtual void* do_allocate(size_t bytes, size_t alignment) = 0;
             virtual void do_deallocate(void* p, size_t bytes, size_t alignment) = 0;
             virtual bool do_is_equal(const memory_resource& other) const = 0;
-            virtual shared_resource do_clone() const = 0;
-
-        private:
-            bool _destroyed;
         };
 
         inline bool operator==(const memory_resource& a, const memory_resource& b)
@@ -77,7 +67,7 @@ namespace eventual
         template <> struct aligned_block<64> { alignas(64) char _x; };
 
         template<class Allocator>
-        class resource_allocator_impl 
+        class resource_adapter_impl
             : public memory_resource
         {
             using size_t = std::size_t;
@@ -85,21 +75,21 @@ namespace eventual
         public:
             typedef Allocator allocator_type;
 
-            resource_allocator_impl() = default;
+            resource_adapter_impl() = default;
 
-            resource_allocator_impl(const resource_allocator_impl&) = default;
+            resource_adapter_impl(const resource_adapter_impl&) = default;
 
-            resource_allocator_impl(const Allocator& allocator)
+            resource_adapter_impl(const Allocator& allocator)
                 : _allocator(allocator)
             { }
 
-            resource_allocator_impl(Allocator&& allocator)
+            resource_adapter_impl(Allocator&& allocator)
                 : _allocator(std::forward<Allocator>(allocator))
             { }
 
             static shared_resource create_shared(allocator_type allocator)
             {
-                return std::allocate_shared<resource_allocator_impl>(allocator, allocator);
+                return std::allocate_shared<resource_adapter_impl>(allocator, allocator);
             }
 
         protected:
@@ -160,16 +150,11 @@ namespace eventual
 
             virtual bool do_is_equal(const memory_resource& other) const override
             {
-                const auto otherPtr = dynamic_cast<const resource_allocator_impl*>(std::addressof(other));
+                const auto otherPtr = dynamic_cast<const resource_adapter_impl*>(std::addressof(other));
                 if (!otherPtr)
                     return false;
 
                 return _allocator == otherPtr->_allocator;
-            }
-
-            virtual shared_resource do_clone() const override
-            {
-                return create_shared(_allocator);
             }
 
         private:
@@ -177,17 +162,17 @@ namespace eventual
             template<size_t Alignment>
             void* do_allocate(size_t bytes)
             {
-                //using block = std::aligned_storage<1, Alignment>;
                 using block_t = aligned_block<Alignment>;
-                using block_traits = std::allocator_traits<allocator_type>::template
+                using block_traits = typename std::allocator_traits<allocator_type>::template
                     rebind_traits<block_t>;
-                using block_alloc = block_traits::allocator_type;
+                using block_alloc = typename block_traits::allocator_type;
 
                 auto blocks = (bytes + Alignment - 1) / Alignment;
                 auto allocator = block_alloc(_allocator);
 
                 auto blockSize = sizeof(block_t);
                 assert((blocks * blockSize) >= bytes);
+                (void)blockSize; // suppresses C4189 in VS2015
 
                 return block_traits::allocate(allocator, blocks);
             }
@@ -195,17 +180,17 @@ namespace eventual
             template<size_t Alignment>
             void do_deallocate(void* p, size_t bytes)
             {
-                //using block = std::aligned_storage<1, Alignment>;
                 using block_t = aligned_block<Alignment>;
-                using block_traits = std::allocator_traits<allocator_type>::template
+                using block_traits = typename std::allocator_traits<allocator_type>::template
                     rebind_traits<block_t>;
-                using block_alloc = block_traits::allocator_type;
+                using block_alloc = typename block_traits::allocator_type;
 
                 auto blocks = (bytes + Alignment - 1) / Alignment;
                 auto allocator = block_alloc(_allocator);
 
                 auto blockSize = sizeof(block_t);
                 assert((blocks * blockSize) >= bytes);
+                (void)blockSize; // suppresses C4189 in VS2015
 
                 block_traits::deallocate(allocator, static_cast<block_t*>(p), blocks);
             }
@@ -214,7 +199,7 @@ namespace eventual
         };
 
         template<class Allocator>
-        using resource_adapter = resource_allocator_impl<std::allocator_traits<Allocator>::template rebind_alloc<char>>;
+        using resource_adapter = resource_adapter_impl<typename std::allocator_traits<Allocator>::template rebind_alloc<char>>;
 
         class default_resource_singleton
         {
@@ -240,6 +225,18 @@ namespace eventual
             typedef T value_type;
             typedef value_type* pointer;
             typedef std::size_t size_type;
+
+            // needed for libstdc++
+            typedef const pointer const_pointer;
+            typedef value_type& reference;
+            typedef const value_type& const_reference;
+            typedef std::ptrdiff_t difference_type;
+
+            template<class U>
+            struct rebind
+            { 
+                typedef polymorphic_allocator<U> other;
+            };
 
             polymorphic_allocator() noexcept
                 : _resource(get_default_resource())
@@ -290,6 +287,7 @@ namespace eventual
             {
                 assert(p);
                 p->~U();
+                (void)p; // suppresses C4100 in VS2015
             }
 
             polymorphic_allocator select_on_container_copy_construction() const
@@ -306,8 +304,24 @@ namespace eventual
         class strong_polymorphic_allocator 
             : public polymorphic_allocator<T>
         {
+            using Base = polymorphic_allocator<T>;
 
         public:
+
+            // needed for libstdc++
+            using value_type      = typename Base::value_type;
+            using pointer         = typename Base::pointer;
+            using size_type       = typename Base::size_type;
+            using const_pointer   = typename Base::const_pointer;
+            using reference       = typename Base::reference;
+            using const_reference = typename Base::const_reference;
+            using difference_type = typename Base::difference_type;
+
+            template<class U>
+            struct rebind
+            {
+                typedef strong_polymorphic_allocator<U> other;
+            };
 
             template<class Alloc, class = std::enable_if_t<!std::is_convertible<Alloc, strong_polymorphic_allocator>::value>>
             strong_polymorphic_allocator(const Alloc& alloc)

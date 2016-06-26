@@ -22,6 +22,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#include <algorithm>
 #include <type_traits>
 #include <functional>
 
@@ -93,8 +94,11 @@ namespace eventual
         template<class T>
         using enable_if_iterator_t = std::enable_if_t<is_iterator<T>::value, T>;
 
-        template<class T, class U>
-        using enable_if_not_same = std::enable_if<!std::is_same<std::decay_t<T>, std::decay_t<U>>::value>;
+        template<typename FirstType, typename SecondType, typename PlacementType = void>
+        using enable_if_not_same = std::enable_if<!std::is_same<std::decay_t<FirstType>, std::decay_t<SecondType>>::value, PlacementType>;
+
+        template<typename FirstType, typename SecondType, typename PlacementType = void>
+        using enable_if_not_same_t = typename enable_if_not_same<FirstType, SecondType, PlacementType>::type;
 
         template<class T, class Alloc, class U = T>
         using enable_if_uses_allocator_t = std::enable_if_t<std::uses_allocator<T, Alloc>::value, U>;
@@ -153,6 +157,9 @@ namespace eventual
             typedef unit_from_type_t<TUnit> type;
         };
 
+        template<class TUnit>
+        using future_from_unit_t = future<type_from_unit_t<TUnit>>;
+
         template<class T, typename = void>
         struct get_state
         {
@@ -194,5 +201,37 @@ namespace eventual
 
         template<class TFuture, class TContinuation>
         using get_continuation_task_t = typename get_continuation_task<TFuture, TContinuation>::task_type;
+
+        //as libstdc++ lacks this type...
+        #if defined(__GLIBCXX__)
+        constexpr std::size_t Max(std::size_t first, std::size_t second, std::size_t third)
+        {
+            return first > second
+                ? (first > third ? first : third)
+                : (second > third ? second : third);
+        }
+
+        constexpr std::size_t Max(std::size_t first, std::size_t second)
+        {
+            return first > second ? first : second;
+        }
+
+        template<std::size_t Len, class Type1, class Type2>
+        struct aligned_union
+        {
+            static constexpr std::size_t alignment_value = Max(alignof(Type1), alignof(Type2));
+
+            struct type
+            {
+                alignas(alignment_value) char _x[Max(Len, sizeof(Type1), sizeof(Type2))];
+            };
+        };
+        #else
+        template<std::size_t Len, class Type1, class Type2>
+        using aligned_union = std::aligned_union<Len, Type1, Type2>;
+        #endif
+
+        template<std::size_t Len, class Type1, class Type2>
+        using aligned_union_t = typename aligned_union<Len, Type1, Type2>::type;
     }
 }
