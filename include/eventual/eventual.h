@@ -426,10 +426,10 @@ namespace eventual
         {
             auto& future = *iterator;
             vectorfuture = vectorfuture.then(
-                [future = move(future)](auto vf) mutable
+                [future = move(future)](auto& vf) mutable
             {
                 return future.then(
-                    [vf = move(vf)](auto future) mutable
+                    [vf = move(vf)](auto& future) mutable
                 {
                     auto resultVector = vf.get();
                     resultVector.emplace_back(move(future));
@@ -480,7 +480,7 @@ namespace eventual
             indexPromise->set_value(noIdx);
 
         return indexfuture.then(
-            [sequence = std::move(futures)](auto firstIndex) mutable
+            [sequence = std::move(futures)](auto& firstIndex) mutable
         {
             result_t result;
             result.index = firstIndex.get();
@@ -515,7 +515,7 @@ namespace eventual
         });
 
         return indexfuture.then(
-            [sequence = move(futuresSequence)](auto firstIndex) mutable
+            [sequence = move(futuresSequence)](auto& firstIndex) mutable
         {
             result_t result;
             result.index = firstIndex.get();
@@ -583,14 +583,7 @@ namespace eventual
             task_t task(allocator_arg_t(), allocator, forward<TContinuation>(continuation));
             auto taskFuture = GetUnwrappedFuture(task);
 
-            state->SetCallback(
-                [
-                    task = move(task),
-                    current = move(current)
-                ]() mutable
-            {
-                task(move(current));
-            });
+            state->SetCallback(CreateCallback(std::move(task), std::move(current)));
 
             return taskFuture;
         }
@@ -604,9 +597,9 @@ namespace eventual
             using namespace std;
 
             auto tailfuture = When_All_(forward<Futures>(others)...);
-            return tailfuture.then([head = move(head)](auto tf) mutable
+            return tailfuture.then([head = move(head)](auto& tf) mutable
             {
-                return head.then([tf = move(tf)](auto h) mutable
+                return head.then([tf = move(tf)](auto& h) mutable
                 {
                     return tuple_cat(make_tuple(move(h)), tf.get());
                 });

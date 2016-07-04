@@ -308,7 +308,7 @@ TEST(FutureTest_Void, Get_BlocksUntilReady)
    EXPECT_TRUE(actual.load());
 }
 
-TEST(FutureTest_Value, Then_InvokesContinuationWhenComplete)
+TEST(FutureTest_Value, Then_InvokesContinuation_ByValue_WhenComplete)
 {
    // Arrange
    promise<int> promise;
@@ -322,6 +322,53 @@ TEST(FutureTest_Value, Then_InvokesContinuationWhenComplete)
 
    // Assert
    EXPECT_EQ(expected, actual) << "Future::then failed to register a continuation that was called.";
+}
+
+TEST(FutureTest_Value, Then_InvokesContinuation_ByLValueReference_WhenComplete)
+{
+    // Arrange
+    promise<int> promise;
+    auto future = promise.get_future();
+    int expected = 12;
+    int actual = -1;
+
+    // Act
+    future.then([&actual](auto& f) { actual = f.get(); });
+    promise.set_value(expected);
+
+    // Assert
+    EXPECT_EQ(expected, actual) << "Future::then failed to register a continuation that was called.";
+}
+
+TEST(FutureTest_Value, Then_InvokesContinuation_ByConstLValueReference_WhenComplete)
+{
+    // Arrange
+    promise<int> promise;
+    auto future = promise.get_future();
+    bool actualIsReady = false;
+
+    // Act
+    future.then([&actualIsReady](const auto& f) { actualIsReady = f.is_ready(); });
+    promise.set_value(0);
+
+    // Assert
+    EXPECT_TRUE(actualIsReady) << "Future::then failed to register a continuation that was called.";
+}
+
+TEST(FutureTest_Value, Then_InvokesContinuation_ByRValueReference_WhenComplete)
+{
+    // Arrange
+    promise<int> promise;
+    auto future = promise.get_future();
+    int expected = 12;
+    int actual = -1;
+
+    // Act
+    future.then([&actual](auto&& f) { actual = f.get(); });
+    promise.set_value(expected);
+
+    // Assert
+    EXPECT_EQ(expected, actual) << "Future::then failed to register a continuation that was called.";
 }
 
 TEST(FutureTest_Reference, Then_InvokesContinuationWhenComplete)

@@ -25,6 +25,13 @@
 #include <algorithm>
 #include <type_traits>
 #include <functional>
+#include <utility>
+
+namespace
+{
+    constexpr long _Cpp14 = 201402L;
+    constexpr long _Cpp11 = 201103L;
+}
 
 namespace eventual
 {
@@ -39,6 +46,10 @@ namespace eventual
         template<class TFunctor, class R, class... ArgTypes> class BasicTask;
 
         template<typename TState1, typename TState2> class CompositeState;
+
+        // not a library template until C++ 17
+        template <typename T>
+        using void_t = void;
 
         struct Unit { };
         
@@ -192,46 +203,86 @@ namespace eventual
         template<class T, class U, class TResult>
         using enable_if_size_is_less_than_or_eq_t = typename std::enable_if<(sizeof(T) <= sizeof(U)), TResult>::type;
 
+        // from: http://talesofcpp.fusionfenix.com/post-11/true-story-call-me-maybe
+        #if (__cplusplus >= _Cpp14)
+
+        template<typename TExpression, typename = void>
+        struct is_callable_impl : std::false_type { };
+
+        template<typename TFunctor, typename... TArgs>
+        struct is_callable_impl<TFunctor(TArgs...), void_t<std::result_of_t<TFunctor(TArgs...)>>> : std::true_type { };
+
+        #elif (__cplusplus >= _Cpp11)
+
+        // c++ 11 SFINAE
+        template <typename Expr, std::size_t Step = 0, typename Enable = void>
+        struct is_callable_impl
+            : is_callable_impl<Expr, Step + 1>
+        { };
+
+        template <typename F, typename T, typename ...Args>
+        struct is_callable_impl<F(T, Args...), 0,
+            void_t<decltype((std::declval<T>().*std::declval<F>())(std::declval<Args>()...))>
+        > : std::true_type
+        { };
+
+        template <typename F, typename T, typename ...Args>
+        struct is_callable_impl<F(T, Args...), 1,
+            void_t<decltype(((*std::declval<T>()).*std::declval<F>())(std::declval<Args>()...))>
+        > : std::true_type
+        { };
+
+        template <typename F, typename T>
+        struct is_callable_impl<F(T), 2,
+            void_t<decltype(std::declval<T>().*std::declval<F>())>
+        > : std::true_type
+        { };
+
+        template <typename F, typename T>
+        struct is_callable_impl<F(T), 3,
+            void_t<decltype((*std::declval<T>()).*std::declval<F>())>
+        > : std::true_type
+        { };
+
+        template <typename F, typename ...Args>
+        struct is_callable_impl<F(Args...), 4,
+            void_t<decltype(std::declval<F>()(std::declval<Args>()...))>
+        > : std::true_type
+        { };
+
+        template <typename Expr>
+        struct is_callable_impl<Expr, 5>
+            : std::false_type
+        { };
+
+        #endif
+
+        template<typename TExpression>
+        struct is_callable : is_callable_impl<TExpression> { };
+
+        template<typename TContinuation, typename TArg>
+        struct get_continuation_result
+        {
+            typedef std::decay_t<TArg> arg_decay_t;
+            typedef std::add_lvalue_reference_t<arg_decay_t> arg_lvalue_t;
+            typedef std::add_rvalue_reference_t<arg_decay_t> arg_rvalue_t;
+            typedef std::decay_t<TContinuation> continuation_decay_t;
+            typedef std::conditional_t<is_callable<continuation_decay_t(arg_lvalue_t)>::value, arg_lvalue_t, arg_rvalue_t> arg_value_t;
+
+            typedef std::result_of_t<continuation_decay_t(arg_value_t)> result_type;
+        };
+
         template<class TFuture, class TContinuation>
         struct get_continuation_task
         {
-            typedef std::result_of_t<std::decay_t<TContinuation>(std::decay_t<TFuture>)> result_type;
-            typedef BasicTask<TContinuation, result_type, TFuture> task_type;
+            using trait = get_continuation_result<TContinuation, TFuture>;
+            
+            typedef typename trait::arg_value_t arg_type;
+            typedef typename trait::result_type result_type;
+            typedef BasicTask<TContinuation, result_type, arg_type> task_type;
         };
 
         template<class TFuture, class TContinuation>
         using get_continuation_task_t = typename get_continuation_task<TFuture, TContinuation>::task_type;
-
-        //as libstdc++ lacks this type...
-        #if defined(__GLIBCXX__)
-        constexpr std::size_t Max(std::size_t first, std::size_t second, std::size_t third)
-        {
-            return first > second
-                ? (first > third ? first : third)
-                : (second > third ? second : third);
-        }
-
-        constexpr std::size_t Max(std::size_t first, std::size_t second)
-        {
-            return first > second ? first : second;
-        }
-
-        template<std::size_t Len, class Type1, class Type2>
-        struct aligned_union
-        {
-            static constexpr std::size_t alignment_value = Max(alignof(Type1), alignof(Type2));
-
-            struct type
-            {
-                alignas(alignment_value) char _x[Max(Len, sizeof(Type1), sizeof(Type2))];
-            };
-        };
-        #else
-        template<std::size_t Len, class Type1, class Type2>
-        using aligned_union = std::aligned_union<Len, Type1, Type2>;
-        #endif
-
-        template<std::size_t Len, class Type1, class Type2>
-        using aligned_union_t = typename aligned_union<Len, Type1, Type2>::type;
     }
 }

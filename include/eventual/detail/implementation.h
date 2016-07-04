@@ -194,7 +194,7 @@ namespace eventual
             };
             
             //todo: fine-tune this size
-            using storage_t = aligned_union_t<32, SmallDelegate<Callable>, LargeDelegate<Callable>>;
+            using storage_t = std::aligned_union_t<32, SmallDelegate<Callable>, LargeDelegate<Callable>>;
 
             using delegate_pointer_t = std::unique_ptr<Delegate, PlacementDestructor<Delegate>>;
 
@@ -610,7 +610,7 @@ namespace eventual
                     }
 
                     auto futureState = TSecondaryState::GetNotifier();
-                    innerFuture.then([futureState = std::move(futureState)](auto future)
+                    innerFuture.then([futureState = std::move(futureState)](auto& future)
                     {
                         CompositeState::SetResultFromFuture(*futureState, future);
                     });
@@ -1109,6 +1109,51 @@ namespace eventual
             static enable_if_not_future_t<T, TOuter<T>> Unwrap(TOuter<T>&& future)
             {
                 return std::forward<TOuter<T>>(future);
+            }
+
+            template<class TFunctor, class TResultType, class TArgType>
+            static decltype(auto) CreateCallback(
+                BasicTask<TFunctor, TResultType, TArgType&>&& task,
+                TArgType&& argument)
+            {
+                using namespace std;
+                using task_t = BasicTask<TFunctor, TResultType, TArgType&>;
+
+                return
+                    [
+                        task = forward<task_t>(task),
+                        argument = forward<TArgType>(argument)
+                    ]() mutable { task(argument); };
+            }
+
+            template<class TFunctor, class TResultType, class TArgType>
+            static decltype(auto) CreateCallback(
+                BasicTask<TFunctor, TResultType, TArgType>&& task,
+                TArgType&& argument)
+            {
+                using namespace std;
+                using task_t = BasicTask<TFunctor, TResultType, TArgType>;
+
+                return
+                    [
+                        task = forward<task_t>(task),
+                        argument = forward<TArgType>(argument)
+                    ]() mutable { task(move(argument)); };
+            }
+
+            template<class TFunctor, class TResultType, class TArgType>
+            static decltype(auto) CreateCallback(
+                BasicTask<TFunctor, TResultType, TArgType&&>&& task,
+                TArgType&& argument)
+            {
+                using namespace std;
+                using task_t = BasicTask<TFunctor, TResultType, TArgType&&>;
+
+                return
+                    [
+                        task = forward<task_t>(task),
+                        argument = forward<TArgType>(argument)
+                    ]() mutable { task(move(argument)); };
             }
 
             void ResetState()

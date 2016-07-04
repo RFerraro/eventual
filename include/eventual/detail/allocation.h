@@ -6,6 +6,7 @@
 #include <cassert>
 #include <atomic>
 #include <cstddef>
+#include <new>
 
 namespace eventual
 {
@@ -57,15 +58,6 @@ namespace eventual
             return !(a == b);
         }
 
-        template <size_t Alignment> struct aligned_block;
-        template <> struct aligned_block<1>  { alignas(1)  char _x; };
-        template <> struct aligned_block<2>  { alignas(2)  char _x; };
-        template <> struct aligned_block<4>  { alignas(4)  char _x; };
-        template <> struct aligned_block<8>  { alignas(8)  char _x; };
-        template <> struct aligned_block<16> { alignas(16) char _x; };
-        template <> struct aligned_block<32> { alignas(32) char _x; };
-        template <> struct aligned_block<64> { alignas(64) char _x; };
-
         template<class Allocator>
         class resource_adapter_impl
             : public memory_resource
@@ -102,27 +94,7 @@ namespace eventual
                     case 2: return do_allocate<2>(bytes);
                     case 4: return do_allocate<4>(bytes);
                     case 8: return do_allocate<8>(bytes);
-                    case 16: return do_allocate<16>(bytes);
-                    case 32: return do_allocate<32>(bytes);
-                    case 64: return do_allocate<64>(bytes);
-                    default:
-                    {
-                        auto blocks = (bytes + sizeof(void*) + alignment - 1) / 64;
-                        auto blockBytes = blocks * 64;
-                        auto beginning = do_allocate<64>(blockBytes);
-
-                        //save room for memory address
-                        auto p = static_cast<char*>(beginning) + sizeof(void*);
-
-                        //round up to the alignment boundary
-                        p += alignment - 1;
-                        p -= (size_t(p)) & (alignment - 1);
-
-                        //store the memory address
-                        reinterpret_cast<void**>(p)[-1] = beginning;
-
-                        return p;
-                    }
+                    default: return do_allocate_n(bytes, alignment);
                 }
             }
 
@@ -134,17 +106,7 @@ namespace eventual
                     case 2: do_deallocate<2>(p, bytes); break;
                     case 4: do_deallocate<4>(p, bytes); break;
                     case 8: do_deallocate<8>(p, bytes); break;
-                    case 16: do_deallocate<16>(p, bytes); break;
-                    case 32: do_deallocate<32>(p, bytes); break;
-                    case 64: do_deallocate<64>(p, bytes); break;
-                    default:
-                    {
-                        auto blocks = (bytes + sizeof(void*) + alignment - 1) / 64;
-                        auto blockBytes = blocks * 64;
-
-                        auto beginning = reinterpret_cast<void**>(p)[-1];
-                        do_deallocate<64>(beginning, blockBytes);
-                    }
+                    default: do_deallocate_n(p, bytes, alignment); break;
                 }
             }
 
@@ -162,7 +124,7 @@ namespace eventual
             template<size_t Alignment>
             void* do_allocate(size_t bytes)
             {
-                using block_t = aligned_block<Alignment>;
+                using block_t = std::aligned_storage_t<1, Alignment>;
                 using block_traits = typename std::allocator_traits<allocator_type>::template
                     rebind_traits<block_t>;
                 using block_alloc = typename block_traits::allocator_type;
@@ -170,17 +132,42 @@ namespace eventual
                 auto blocks = (bytes + Alignment - 1) / Alignment;
                 auto allocator = block_alloc(_allocator);
 
-                auto blockSize = sizeof(block_t);
-                assert((blocks * blockSize) >= bytes);
-                (void)blockSize; // suppresses C4189 in VS2015
+                assert((blocks * sizeof(block_t)) >= bytes);
 
                 return block_traits::allocate(allocator, blocks);
+            }
+
+            void* do_allocate_n(size_t bytes, size_t alignment)
+            {
+                constexpr auto maxAlignment = alignof(std::max_align_t);
+                
+                // check if alignment is a power of 2...
+                assert(alignment != 0);
+                assert((alignment & (alignment - 1)) == 0);
+
+                auto blocks = (bytes + sizeof(void*) + alignment - 1) / maxAlignment;
+                auto blockBytes = blocks * maxAlignment;
+                auto beginning = do_allocate<maxAlignment>(blockBytes);
+
+                //save room for memory address
+                auto p = static_cast<char*>(beginning) + sizeof(void*);
+
+                //round up to the alignment boundary
+                auto unaligned = static_cast<void*>(p);
+                auto aligned = std::align(alignment, sizeof(char), unaligned, blockBytes);
+
+                assert(aligned != nullptr);
+
+                //store the memory address
+                reinterpret_cast<void**>(aligned)[-1] = beginning;
+
+                return aligned;
             }
 
             template<size_t Alignment>
             void do_deallocate(void* p, size_t bytes)
             {
-                using block_t = aligned_block<Alignment>;
+                using block_t = std::aligned_storage_t<1, Alignment>;
                 using block_traits = typename std::allocator_traits<allocator_type>::template
                     rebind_traits<block_t>;
                 using block_alloc = typename block_traits::allocator_type;
@@ -188,11 +175,24 @@ namespace eventual
                 auto blocks = (bytes + Alignment - 1) / Alignment;
                 auto allocator = block_alloc(_allocator);
 
-                auto blockSize = sizeof(block_t);
-                assert((blocks * blockSize) >= bytes);
-                (void)blockSize; // suppresses C4189 in VS2015
+                assert((blocks * sizeof(block_t)) >= bytes);
 
                 block_traits::deallocate(allocator, static_cast<block_t*>(p), blocks);
+            }
+
+            void do_deallocate_n(void* p, size_t bytes, size_t alignment)
+            {
+                constexpr auto maxAlignment = alignof(std::max_align_t);
+                
+                // check if alignment is a power of 2...
+                assert(alignment != 0);
+                assert((alignment & (alignment - 1)) == 0);
+
+                auto blocks = (bytes + sizeof(void*) + alignment - 1) / maxAlignment;
+                auto blockBytes = blocks * maxAlignment;
+
+                auto beginning = reinterpret_cast<void**>(p)[-1];
+                do_deallocate<maxAlignment>(beginning, blockBytes);
             }
 
             allocator_type _allocator;

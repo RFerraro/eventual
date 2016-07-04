@@ -80,7 +80,10 @@ void Chaining_Continuations()
       .then([](auto f) { f.get(); return 1.5; })
       .then([](auto f) { f.get(); return "something..."; })
       .then([](auto f) { f.get(); return std::tuple<>(); })
-      .then([](auto f) { f.get(); return 0; });
+      .then([](auto f) { f.get(); return 0; })
+      .then([](auto& f) { f.get(); return 0; })
+      .then([](const auto& f) { f.valid(); return 0; })
+      .then([](auto&& f) { f.get(); return 0; });
 
 }
 

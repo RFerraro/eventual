@@ -78,6 +78,7 @@ namespace eventual
         static detail::enable_if_uses_allocator_t<TFunctor, Allocator>
             CreateFunctor(const Allocator& alloc, TCallable&& function)
         {
+            //todo: C++ 17 removes erased allocators for std::function...
             return TFunctor(std::allocator_arg_t(), alloc, std::forward<TCallable>(function));
         }
 
@@ -85,6 +86,7 @@ namespace eventual
         static detail::enable_if_doesnt_use_allocator_t<TFunctor, Allocator>
             CreateFunctor(const Allocator&, TCallable&& function)
         {
+            //todo: C++ 17 removes erased allocators for std::function...
             // because libstdc++'s std::function doesn't support custom allocation...
             return TFunctor(std::forward<TCallable>(function));
         }
