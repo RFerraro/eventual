@@ -4,6 +4,8 @@
 
 # Conan
 conaninfo.txt
+conanbuildinfo*.cmake
+conanbuildinfo.cmake
 
 # VC++ 2015
 *.VC.db

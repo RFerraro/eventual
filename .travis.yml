@@ -1,82 +1,28 @@
-sudo: false
-language: cpp
+sudo: required
+language: generic
+dist: trusty
+
+services:
+   - docker
 
 cache: 
-   pip: true
-   apt: true
    directories:
-      - $HOME/.conan
-   
-
+      - /tmp/conan
+      
 matrix:
    fast-finish: true
-   include:
-      - compiler: clang
-        env: COMPILER=clang CONFIGURATION=Debug COMPILER_CXX=clang++-3.7 COMPILER_CC=clang-3.7
-        addons:
-           apt:
-              sources:
-                 - ubuntu-toolchain-r-test
-                 - llvm-toolchain-precise-3.7
-                 - kalakris-cmake
-              packages:
-                 - clang-3.7
-                 - llvm-3.7
-                 - libstdc++6
-                 - cmake
-      - compiler: clang
-        env: COMPILER=clang CONFIGURATION=Release COMPILER_CXX=clang++-3.7 COMPILER_CC=clang-3.7
-        addons:
-           apt:
-              sources:
-                 - ubuntu-toolchain-r-test
-                 - llvm-toolchain-precise-3.7
-                 - kalakris-cmake
-              packages:
-                 - clang-3.7
-                 - libstdc++6
-                 - cmake
-      - compiler: gcc
-        env: COMPILER=gcc CONFIGURATION=Debug COMPILER_CXX=g++-5 COMPILER_CC=gcc-5
-        addons:
-           apt:
-              sources:
-                 - ubuntu-toolchain-r-test
-                 - kalakris-cmake
-              packages:
-                 - g++-5
-                 - gcc-5
-                 - cmake
-      - compiler: gcc
-        env: COMPILER=gcc CONFIGURATION=Release COMPILER_CXX=g++-5 COMPILER_CC=gcc-5
-        addons:
-           apt:
-              sources:
-                 - ubuntu-toolchain-r-test
-                 - kalakris-cmake
-              packages:
-                 - g++-5
-                 - gcc-5
-                 - cmake
+      
+env:
+   global:
+      - DOCKER_NAME=rferraro/cxx-travis-ci
+   matrix:
+      - DOCKER_TAG=clang-3.7.1 CONFIGURATION=Debug
+      - DOCKER_TAG=clang-3.7.1 CONFIGURATION=Release
+      - DOCKER_TAG=gcc-5.3.0   CONFIGURATION=Debug
+      - DOCKER_TAG=gcc-5.3.0   CONFIGURATION=Release
 
-before_install:
-   - export CXX="${COMPILER_CXX}" CC="${COMPILER_CC}"
-  
 install:
-   - pip install --user conan
-   - pip install --user cpp-coveralls
-   - conan user
-   - conan --version
-   - conan install . -s compiler=$COMPILER -s build_type=$CONFIGURATION -s compiler.libcxx='libstdc++11' --build=missing
-   
-before_script:
-   - mkdir build
-   - cd build
+   - docker pull "${DOCKER_NAME}:${DOCKER_TAG}"
 
 script: 
-   - cmake -DCMAKE_BUILD_TYPE=$CONFIGURATION .. 
-   - cmake --build .
-   - ./test/bin/Test
-
-after_success:
-   - if [[ "${CONFIGURATION}" = "Debug" ]]; then ../tools/travis/post_coverage_results.sh; fi
+   - ./tools/travis/build.sh
