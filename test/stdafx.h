@@ -9,17 +9,17 @@
 #include <gtest/gtest.h>
 #include <eventual/eventual.h>
 
-template class eventual::Future<void>;
-template class eventual::Future<int>;
-template class eventual::Future<int&>;
+template class eventual::future<void>;
+template class eventual::future<int>;
+template class eventual::future<int&>;
 
-template class eventual::Shared_Future<void>;
-template class eventual::Shared_Future<int>;
-template class eventual::Shared_Future<int&>;
+template class eventual::shared_future<void>;
+template class eventual::shared_future<int>;
+template class eventual::shared_future<int&>;
 
-template class eventual::Promise<void>;
-template class eventual::Promise<int>;
-template class eventual::Promise<int&>;
+template class eventual::promise<void>;
+template class eventual::promise<int>;
+template class eventual::promise<int&>;
 
-template class eventual::Packaged_Task<void(int)>;
-template class eventual::Packaged_Task<int(int)>;
+template class eventual::packaged_task<void(int)>;
+template class eventual::packaged_task<int(int)>;

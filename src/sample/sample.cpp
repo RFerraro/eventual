@@ -26,91 +26,93 @@ public:
 
 void Sample_BasicContinuation()
 {
-   Future<int> future1 = Make_Ready_Future(3);
-   future1.Then([](Future<int> f)
+   future<int> future1 = make_ready_future(3);
+   future1.then([](future<int> f)
    {
       //immediately calls this lambda
-       f.Get();
+       f.get();
    });
 
    // or call a pointer
-   Future<std::string> future2 = Make_Ready_Future(std::string("something"));
-   future2.Then(&DoSomething<Future<std::string>>);
+   future<std::string> future2 = make_ready_future(std::string("something"));
+   future2.then(&DoSomething<future<std::string>>);
 
    // or a functor
-   Future<void> future3 = Make_Ready_Future();
-   future3.Then(Continuation<Future<void>>());
+   future<void> future3 = make_ready_future();
+   future3.then(Continuation<future<void>>());
 
    // promises control when the continuation is called:
    int refValue = 17;
-   Promise<int&> promise;
-   Future<int&> future4 = promise.Get_Future();
-   future4.Then([](Future<int&> f)
+   promise<int&> promise;
+   future<int&> future4 = promise.get_future();
+   future4.then([](future<int&> f)
    {
-      // not invoked until Promise<>::Set_Value(...) is called.
-      f.Get();
+      // not invoked until Promise<>::set_value(...) is called.
+      f.get();
    });
    // ... do other stuff
-   promise.Set_Value(refValue);
-
+   promise.set_value(refValue);
 }
 
 void Chaining_Continuations()
 {
    // it gets really interesting when you link together continuations:
 
-   Future<int> future = Make_Ready_Future(14);
-   future
-      .Then([](Future<int> f) { f.Get(); return 1.1f; })
-      .Then([](Future<float> f) { f.Get(); return std::string(); })
-      .Then([](Future<std::string> f)
+   future<int> future1 = make_ready_future(14);
+   future1
+      .then([](future<int> f) { f.get(); return 1.1f; })
+      .then([](future<float> f) { f.get(); return std::string(); })
+      .then([](future<std::string> f)
          {
-             f.Get();
+             f.get();
              
              // nested futures are implicitly unwrapped
             // so Future<Future<void>> becomes Future<void>
-            // when returned from .Then()
-            return Make_Ready_Future();
+            // when returned from .then()
+            return make_ready_future();
          })
-      .Then([](Future<void> f) { f.Get(); });
+      .then([](future<void> f) { f.get(); });
 
    // of course modern style type deduction is supported
 
-   auto future2 = Make_Ready_Future(13);
+   auto future2 = make_ready_future(13);
    future2
-      .Then([](auto f) { f.Get(); return 1.5; })
-      .Then([](auto f) { f.Get(); return "something..."; })
-      .Then([](auto f) { f.Get(); return std::tuple<>(); })
-      .Then([](auto f) { f.Get(); return 0; });
+      .then([](auto f) { f.get(); return 1.5; })
+      .then([](auto f) { f.get(); return "something..."; })
+      .then([](auto f) { f.get(); return std::tuple<>(); })
+      .then([](auto f) { f.get(); return 0; })
+      .then([](auto& f) { f.get(); return 0; })
+      .then([](const auto& f) { f.valid(); return 0; })
+      .then([](auto&& f) { f.get(); return 0; });
 
 }
 
 void Examples_When_Any()
 {
-   Promise<int> first;
-   Promise<int> second;
-   Promise<int> third;
+    promise<int> first;
+    promise<int> second;
+    promise<int> third;
 
-   auto resultFuture = When_Any(first.Get_Future(), second.Get_Future(), third.Get_Future());
-   second.Set_Value(1221);
+   auto resultFuture = when_any(first.get_future(), second.get_future(), third.get_future());
+   second.set_value(1221);
 
-   auto result = resultFuture.Get();
+   auto result = resultFuture.get();
 
    // the veradic future result returns the index that completed.
    assert(result.index == 1);
 
-   Promise<int> fourth;
-   Promise<int> fifth;
-   Promise<int> sixth;
-   std::vector<Future<int>> futures;
-   futures.emplace_back(fourth.Get_Future());
-   futures.emplace_back(fifth.Get_Future());
-   futures.emplace_back(sixth.Get_Future());
+   promise<int> fourth;
+   promise<int> fifth;
+   promise<int> sixth;
+   std::vector<future<int>> futures;
+   futures.emplace_back(fourth.get_future());
+   futures.emplace_back(fifth.get_future());
+   futures.emplace_back(sixth.get_future());
    
-   auto resultFuture2 = When_Any(futures.begin(), futures.end());
-   sixth.Set_Value(1818);
+   auto resultFuture2 = when_any(futures.begin(), futures.end());
+   sixth.set_value(1818);
 
-   auto result2 = resultFuture2.Get();
+   auto result2 = resultFuture2.get();
    
    // the iterator future result returns the index that completed.
    assert(result2.index == 2);
@@ -118,56 +120,56 @@ void Examples_When_Any()
 
 void Examples_When_All()
 {
-   Promise<int> first;
-   Promise<int> second;
-   Promise<int> third;
+   promise<int> first;
+   promise<int> second;
+   promise<int> third;
 
-   auto resultFuture = When_All(first.Get_Future(), second.Get_Future(), third.Get_Future());
-   first.Set_Value(123);
-   second.Set_Value(234);
-   third.Set_Value(345);
+   auto resultFuture = when_all(first.get_future(), second.get_future(), third.get_future());
+   first.set_value(123);
+   second.set_value(234);
+   third.set_value(345);
 
    // result completes when all futures are complete, returning a tuple of futures.
-   auto result = resultFuture.Get();
-   assert(std::get<0>(result).Get() == 123);
-   assert(std::get<1>(result).Get() == 234);
-   assert(std::get<2>(result).Get() == 345);
+   auto result = resultFuture.get();
+   assert(std::get<0>(result).get() == 123);
+   assert(std::get<1>(result).get() == 234);
+   assert(std::get<2>(result).get() == 345);
 
-   Promise<int> fourth;
-   Promise<int> fifth;
-   Promise<int> sixth;
-   std::vector<Future<int>> futures;
-   futures.emplace_back(fourth.Get_Future());
-   futures.emplace_back(fifth.Get_Future());
-   futures.emplace_back(sixth.Get_Future());
+   promise<int> fourth;
+   promise<int> fifth;
+   promise<int> sixth;
+   std::vector<future<int>> futures;
+   futures.emplace_back(fourth.get_future());
+   futures.emplace_back(fifth.get_future());
+   futures.emplace_back(sixth.get_future());
 
-   auto resultFuture2 = When_All(futures.begin(), futures.end());
-   fourth.Set_Value(456);
-   fifth.Set_Value(567);
-   sixth.Set_Value(678);
+   auto resultFuture2 = when_all(futures.begin(), futures.end());
+   fourth.set_value(456);
+   fifth.set_value(567);
+   sixth.set_value(678);
 
    // result completes when all futures are complete, returning a vector of futures.
-   auto result2 = resultFuture2.Get();
-   assert(result2.at(0).Get() == 456);
-   assert(result2.at(1).Get() == 567);
-   assert(result2.at(2).Get() == 678);
+   auto result2 = resultFuture2.get();
+   assert(result2.at(0).get() == 456);
+   assert(result2.at(1).get() == 567);
+   assert(result2.at(2).get() == 678);
 }
 
 void Examples_Make_Ready_Future()
 {
-   auto future = Make_Ready_Future<int>(35219);
+   auto future = make_ready_future<int>(35219);
 
-   assert(future.Get() == 35219);
+   assert(future.get() == 35219);
 }
 
 void Examples_Make_Exceptional_Future()
 {
    struct Anonymous { };
-   auto future = Make_Exceptional_Future<int, Anonymous>(Anonymous());
+   auto future = make_exceptional_future<int, Anonymous>(Anonymous());
 
    try
    {
-      future.Get();
+      future.get();
    }
    catch (const Anonymous&)
    {
@@ -175,11 +177,11 @@ void Examples_Make_Exceptional_Future()
    }
 
    auto exPtr = std::make_exception_ptr(Anonymous());
-   auto future2 = Make_Exceptional_Future<int>(exPtr);
+   auto future2 = make_exceptional_future<int>(exPtr);
 
    try
    {
-      future2.Get();
+      future2.get();
    }
    catch (const Anonymous&)
    {

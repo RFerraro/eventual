@@ -15,15 +15,15 @@ namespace
    class TestException { };
 
    template<class R>
-   Future<R> MakeCompleteFuture()
+   future<R> MakeCompleteFuture()
    {
       struct Anonymous { };
-      return eventual::Make_Exceptional_Future<R>(std::make_exception_ptr(Anonymous()));
+      return eventual::make_exceptional_future<R>(std::make_exception_ptr(Anonymous()));
    }
 }
 
 // Parameterized Typed Tests
-typedef testing::Types<Future<void>, Future<int>, Future<int&>> FutureTypes;
+typedef testing::Types<future<void>, future<int>, future<int&>> FutureTypes;
 INSTANTIATE_TYPED_TEST_CASE_P(Future, FutureTestPatterns, FutureTypes);
 
 // Typed Tests
@@ -36,27 +36,27 @@ TYPED_TEST_CASE(FutureTest, FutureReturnTypes); // ignore intellisense warning
 TYPED_TEST(FutureTest, Future_IsNotCopyConstructable)
 {
    // Assert
-   EXPECT_FALSE(std::is_copy_constructible<Future<TypeParam>>::value) << "Future should not be copy constructable.";
+   EXPECT_FALSE(std::is_copy_constructible<future<TypeParam>>::value) << "Future should not be copy constructable.";
 }
 
 TYPED_TEST(FutureTest, Future_ConstructorUnwrapsNestedFutures)
 {
    // Arrange
-   Future<Future<TypeParam>> nested = MakeCompleteFuture<Future<TypeParam>>();
+   future<future<TypeParam>> nested = MakeCompleteFuture<future<TypeParam>>();
 
    // Act
-   Future<TypeParam> unwrapped(std::move(nested));
+   future<TypeParam> unwrapped(std::move(nested));
 
    // Assert
-   EXPECT_FALSE(nested.Valid()) << "nested future should not remain valid";
-   EXPECT_TRUE(unwrapped.Valid()) << "Unwrapped future should be valid";
+   EXPECT_FALSE(nested.valid()) << "nested future should not remain valid";
+   EXPECT_TRUE(unwrapped.valid()) << "Unwrapped future should be valid";
 }
 
 // questionable value...
 TYPED_TEST(FutureTest, Future_IsNotCopyAssignable)
 {
    // Assert
-   EXPECT_FALSE(std::is_copy_assignable<Future<TypeParam>>::value) << "Future should not be copy assignable.";
+   EXPECT_FALSE(std::is_copy_assignable<future<TypeParam>>::value) << "Future should not be copy assignable.";
 }
 
 TYPED_TEST(FutureTest, Share_InvalidatesFuture)
@@ -65,20 +65,20 @@ TYPED_TEST(FutureTest, Share_InvalidatesFuture)
    auto future = MakeCompleteFuture<TypeParam>();
 
    // Act
-   Shared_Future<TypeParam> shared = future.Share();
+   shared_future<TypeParam> shared = future.share();
 
    // Assert
-   EXPECT_FALSE(future.Valid()) << "Original future should be invalid after transfer to shared.";
-   EXPECT_TRUE(shared.Valid()) << "Shared future should valid";
+   EXPECT_FALSE(future.valid()) << "Original future should be invalid after transfer to shared.";
+   EXPECT_TRUE(shared.valid()) << "Shared future should valid";
 }
 
 TYPED_TEST(FutureTest, Share_ThrowsWhenInvalid)
 {
    // Arrange
-   Future<TypeParam> future;
+   future<TypeParam> future;
 
    // Act/Assert
-   EXPECT_THROW(future.Share(), std::future_error) << "Share did not throw an exception when the future state was invalid";
+   EXPECT_THROW(future.share(), std::future_error) << "share did not throw an exception when the future state was invalid";
 }
 
 TYPED_TEST(FutureTest, Then_InvalidatesFuture)
@@ -87,10 +87,10 @@ TYPED_TEST(FutureTest, Then_InvalidatesFuture)
    auto future = MakeCompleteFuture<TypeParam>();
 
    // Act
-   future.Then([](auto) { });
+   future.then([](auto) { });
 
    // Assert
-   EXPECT_FALSE(future.Valid()) << "Future::Then failed to invalidate the future.";
+   EXPECT_FALSE(future.valid()) << "Future::then failed to invalidate the future.";
 }
 
 TYPED_TEST(FutureTest, Get_InvalidatesFuture)
@@ -101,12 +101,12 @@ TYPED_TEST(FutureTest, Get_InvalidatesFuture)
    // Act
    try
    {
-      future.Get();
+      future.get();
    }
    catch (...) { }
 
    // Assert
-   EXPECT_FALSE(future.Valid()) << "Future::Get failed to invalidate the future.";
+   EXPECT_FALSE(future.valid()) << "Future::get failed to invalidate the future.";
 }
 
 // Standard tests
@@ -115,10 +115,10 @@ TEST(FutureTest_Value, Get_ReturnsCorrectValueWhenReady)
 {
    // Arrange
    int expected = 13;
-   auto future = Make_Ready_Future(expected);
+   auto future = make_ready_future(expected);
 
    // Act
-   int actual = future.Get();
+   int actual = future.get();
 
    // Assert
    EXPECT_EQ(expected, actual) << "The future did not return the expected value.";
@@ -130,16 +130,16 @@ TEST(FutureTest_RValue, Get_ReturnsCorrectRValueWhenReady)
    int expectedMarker = 761;
    auto np = NonCopyable();
    np._markerValue = expectedMarker;
-   Future<NonCopyable> future;
+   future<NonCopyable> future;
    
    {
-      Promise<NonCopyable> promise;
-      promise.Set_Value(std::move(np));
-      future = promise.Get_Future();
+      promise<NonCopyable> promise;
+      promise.set_value(std::move(np));
+      future = promise.get_future();
    }
 
    // Act
-   auto result = future.Get();
+   auto result = future.get();
 
    // Assert
    EXPECT_EQ(expectedMarker, result._markerValue) << "The future did not return the expected value.";
@@ -150,12 +150,12 @@ TEST(FutureTest_Reference, Get_ReturnsCorrectReferenceWhenReady)
    // Arrange
    int expected = 13;
    auto expectedAddress = &expected;
-   Promise<int&> promise;
-   promise.Set_Value(expected);
-   auto future = promise.Get_Future();
+   promise<int&> promise;
+   promise.set_value(expected);
+   auto future = promise.get_future();
 
    // Act
-   int& actual = future.Get();
+   int& actual = future.get();
 
    // Assert
    auto actualAddress = &actual;
@@ -168,16 +168,16 @@ TEST(FutureTest_Reference, Get_ReturnsCorrectReferenceAfterPromiseDeleted)
    // Arrange
    int expected = 18;
    auto expectedAddress = &expected;
-   Future<int&> future;
+   future<int&> future;
 
    {
-      Promise<int&> promise;
-      promise.Set_Value(expected);
-      future = promise.Get_Future();
+      promise<int&> promise;
+      promise.set_value(expected);
+      future = promise.get_future();
    }
 
    // Act
-   int& actual = future.Get();
+   int& actual = future.get();
 
    // Assert
    auto actualAddress = &actual;
@@ -187,20 +187,20 @@ TEST(FutureTest_Reference, Get_ReturnsCorrectReferenceAfterPromiseDeleted)
 TEST(FutureTest_Void, Get_ReturnsVoidWhenReady)
 {
    // Arrange
-   auto future = Make_Ready_Future();
+   auto future = make_ready_future();
 
    // Act
-   EXPECT_NO_THROW(future.Get());
+   EXPECT_NO_THROW(future.get());
 
    // Assert (-ish, more of a compile-time constant)
-   EXPECT_TRUE(std::is_void<std::result_of<decltype(&Future<void>::Get)(Future<void>)>::type>::value) << "Future<void>::Get() does not return void.";
+   EXPECT_TRUE(std::is_void<std::result_of<decltype(&eventual::future<void>::get)(eventual::future<void>)>::type>::value) << "future<void>::get() does not return void.";
 }
 
 TEST(FutureTest_Value, Get_BlocksUntilReady)
 {
    // Arrange
-   auto promise = Promise<int>();
-   auto future = promise.Get_Future();
+   promise<int> promise;
+   auto future = promise.get_future();
    std::atomic_bool actual(false);
 
    std::mutex m;
@@ -216,7 +216,7 @@ TEST(FutureTest_Value, Get_BlocksUntilReady)
       }
       cv.notify_all();
       
-      future.Get();
+      future.get();
       actual.store(true);
    });
 
@@ -224,9 +224,9 @@ TEST(FutureTest_Value, Get_BlocksUntilReady)
    cv.wait(l, [&]() { return ready; });
    std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
-   EXPECT_FALSE(future.Is_Ready());
+   EXPECT_FALSE(future.is_ready());
    EXPECT_FALSE(actual.load());
-   promise.Set_Value(4);
+   promise.set_value(4);
 
    // Assert
    worker.join();
@@ -237,8 +237,8 @@ TEST(FutureTest_Reference, Get_BlocksUntilReady)
 {
    // Arrange
    int expectedValue = 5;
-   auto promise = Promise<int&>();
-   auto future = promise.Get_Future();
+   promise<int&> promise;
+   auto future = promise.get_future();
    std::atomic_bool actual(false);
 
    std::mutex m;
@@ -254,7 +254,7 @@ TEST(FutureTest_Reference, Get_BlocksUntilReady)
       }
       cv.notify_all();
       
-      future.Get();
+      future.get();
       actual.store(true);
    });
 
@@ -262,9 +262,9 @@ TEST(FutureTest_Reference, Get_BlocksUntilReady)
    cv.wait(l, [&]() { return ready; });
    std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
-   EXPECT_FALSE(future.Is_Ready());
+   EXPECT_FALSE(future.is_ready());
    EXPECT_FALSE(actual.load());
-   promise.Set_Value(expectedValue);
+   promise.set_value(expectedValue);
 
    // Assert
    worker.join();
@@ -274,8 +274,8 @@ TEST(FutureTest_Reference, Get_BlocksUntilReady)
 TEST(FutureTest_Void, Get_BlocksUntilReady)
 {
    // Arrange
-   auto promise = Promise<void>();
-   auto future = promise.Get_Future();
+   promise<void> promise;
+   auto future = promise.get_future();
    std::atomic_bool actual(false);
 
    std::mutex m;
@@ -291,7 +291,7 @@ TEST(FutureTest_Void, Get_BlocksUntilReady)
       }
       cv.notify_all();
       
-      future.Get();
+      future.get();
       actual.store(true);
    });
 
@@ -299,134 +299,181 @@ TEST(FutureTest_Void, Get_BlocksUntilReady)
    cv.wait(l, [&]() { return ready; });
    std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
-   EXPECT_FALSE(future.Is_Ready());
+   EXPECT_FALSE(future.is_ready());
    EXPECT_FALSE(actual.load());
-   promise.Set_Value();
+   promise.set_value();
 
    // Assert
    worker.join();
    EXPECT_TRUE(actual.load());
 }
 
-TEST(FutureTest_Value, Then_InvokesContinuationWhenComplete)
+TEST(FutureTest_Value, Then_InvokesContinuation_ByValue_WhenComplete)
 {
    // Arrange
-   Promise<int> promise;
-   auto future = promise.Get_Future();
+   promise<int> promise;
+   auto future = promise.get_future();
    int expected = 12;
    int actual = -1;
    
    // Act
-   future.Then([&actual](auto f) { actual = f.Get(); });
-   promise.Set_Value(expected);
+   future.then([&actual](auto f) { actual = f.get(); });
+   promise.set_value(expected);
 
    // Assert
-   EXPECT_EQ(expected, actual) << "Future::Then failed to register a continuation that was called.";
+   EXPECT_EQ(expected, actual) << "Future::then failed to register a continuation that was called.";
+}
+
+TEST(FutureTest_Value, Then_InvokesContinuation_ByLValueReference_WhenComplete)
+{
+    // Arrange
+    promise<int> promise;
+    auto future = promise.get_future();
+    int expected = 12;
+    int actual = -1;
+
+    // Act
+    future.then([&actual](auto& f) { actual = f.get(); });
+    promise.set_value(expected);
+
+    // Assert
+    EXPECT_EQ(expected, actual) << "Future::then failed to register a continuation that was called.";
+}
+
+TEST(FutureTest_Value, Then_InvokesContinuation_ByConstLValueReference_WhenComplete)
+{
+    // Arrange
+    promise<int> promise;
+    auto future = promise.get_future();
+    bool actualIsReady = false;
+
+    // Act
+    future.then([&actualIsReady](const auto& f) { actualIsReady = f.is_ready(); });
+    promise.set_value(0);
+
+    // Assert
+    EXPECT_TRUE(actualIsReady) << "Future::then failed to register a continuation that was called.";
+}
+
+TEST(FutureTest_Value, Then_InvokesContinuation_ByRValueReference_WhenComplete)
+{
+    // Arrange
+    promise<int> promise;
+    auto future = promise.get_future();
+    int expected = 12;
+    int actual = -1;
+
+    // Act
+    future.then([&actual](auto&& f) { actual = f.get(); });
+    promise.set_value(expected);
+
+    // Assert
+    EXPECT_EQ(expected, actual) << "Future::then failed to register a continuation that was called.";
 }
 
 TEST(FutureTest_Reference, Then_InvokesContinuationWhenComplete)
 {
    // Arrange
-   Promise<int&> promise;
-   auto future = promise.Get_Future();
+   promise<int&> promise;
+   auto future = promise.get_future();
    int expected = 12;
    auto expectedAddress = &expected;
    int* actualAddress = nullptr;
 
    // Act
-   future.Then([&actualAddress](auto f)
+   future.then([&actualAddress](auto f)
    { 
-      auto& temp = f.Get();
+      auto& temp = f.get();
       actualAddress = &temp;
    });
-   promise.Set_Value(expected);
+   promise.set_value(expected);
 
    // Assert
-   EXPECT_EQ(expectedAddress, actualAddress) << "Future::Then failed to register a continuation that was called.";
+   EXPECT_EQ(expectedAddress, actualAddress) << "Future::then failed to register a continuation that was called.";
 }
 
 TEST(FutureTest_Void, Then_InvokesContinuationWhenComplete)
 {
    // Arrange
-   Promise<void> promise;
-   auto future = promise.Get_Future();
+   promise<void> promise;
+   auto future = promise.get_future();
    bool continuationCalled = false;
 
    // Act
-   future.Then([&continuationCalled](auto f)
+   future.then([&continuationCalled](auto f)
    {
-      f.Get();
+      f.get();
       continuationCalled = true;
    });
-   promise.Set_Value();
+   promise.set_value();
 
    // Assert
-   EXPECT_TRUE(continuationCalled) << "Future::Then failed to register a continuation that was called.";
+   EXPECT_TRUE(continuationCalled) << "Future::then failed to register a continuation that was called.";
 }
 
 TEST(FutureTest_Value, Then_UnwrapsAndReturnsNestedResultWhenComplete)
 {
    // Arrange
-   Promise<int> promise;
-   auto future = promise.Get_Future();
+   eventual::promise<int> outer;
+   auto future = outer.get_future();
    int expected = 13;
 
    // Act
-   auto unwrapped = future.Then([](auto f)
+   auto unwrapped = future.then([](auto f)
    {
-      Promise<int> inner;
-      auto temp = f.Get() + 1;
-      inner.Set_Value(temp);
-      return inner.Get_Future();
+      eventual::promise<int> inner;
+      auto temp = f.get() + 1;
+      inner.set_value(temp);
+      return inner.get_future();
    });
-   promise.Set_Value(12);
-   auto actual = unwrapped.Get();
+   outer.set_value(12);
+   auto actual = unwrapped.get();
 
    // Assert
-   EXPECT_EQ(expected, actual) << "Future::Then failed to return the expected value of the unwrapped continuation.";
+   EXPECT_EQ(expected, actual) << "Future::then failed to return the expected value of the unwrapped continuation.";
 }
 
 TEST(FutureTest_Reference, Then_UnwrapsAndReturnsNestedResultWhenComplete)
 {
    // Arrange
-   Promise<int&> promise;
-   auto future = promise.Get_Future();
+   eventual::promise<int&> promise;
+   auto future = promise.get_future();
    int expected = 12;
    auto expectedAddress = &expected;
 
    // Act
-   auto unwrapped = future.Then([](auto f)
+   auto unwrapped = future.then([](auto f)
    {
-      Promise<int&> inner;
-      auto& temp = f.Get();
-      inner.Set_Value(temp);
-      return inner.Get_Future();
+      eventual::promise<int&> inner;
+      auto& temp = f.get();
+      inner.set_value(temp);
+      return inner.get_future();
    });
-   promise.Set_Value(expected);
-   auto& actual = unwrapped.Get();
+   promise.set_value(expected);
+   auto& actual = unwrapped.get();
    auto actualAddress = &actual;
 
    // Assert
-   EXPECT_EQ(expectedAddress, actualAddress) << "Future::Then failed to return the expected value of the unwrapped continuation.";
+   EXPECT_EQ(expectedAddress, actualAddress) << "Future::then failed to return the expected value of the unwrapped continuation.";
 }
 
 TEST(FutureTest_Void, Then_UnwrapsAndReturnsNestedVoidWhenComplete)
 {
    // Arrange
-   Promise<void> promise;
-   auto future = promise.Get_Future();
+   promise<void> promise;
+   auto future = promise.get_future();
    bool continuationCalled = false;
 
    // Act
-   Future<void> unwrapped = future.Then([&continuationCalled](auto f)
+   eventual::future<void> unwrapped = future.then([&continuationCalled](auto f)
    {
-      f.Get();
+      f.get();
       continuationCalled = true;
-      return Make_Ready_Future();
+      return make_ready_future();
    });
-   promise.Set_Value();
-   unwrapped.Get();
+   promise.set_value();
+   unwrapped.get();
 
    // Assert
-   EXPECT_TRUE(continuationCalled) << "Future::Then failed to return the unwrapped continuation..";
+   EXPECT_TRUE(continuationCalled) << "Future::then failed to return the unwrapped continuation..";
 }

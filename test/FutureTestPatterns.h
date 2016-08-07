@@ -16,13 +16,13 @@ class FutureTestPatterns : public testing::Test
    struct get_inner_type;
 
    template<class R>
-   struct get_inner_type<eventual::Future<R>>
+   struct get_inner_type<eventual::future<R>>
    {
       typedef R InnerType;
    };
 
    template<class R>
-   struct get_inner_type<eventual::Shared_Future<R>>
+   struct get_inner_type<eventual::shared_future<R>>
    {
       typedef R InnerType;
    };
@@ -35,22 +35,22 @@ protected:
    template<class Ex>
    static T MakeExceptionalFuture(Ex exception)
    {
-      return T(eventual::Make_Exceptional_Future<InnerType>(std::make_exception_ptr(exception)));
+      return T(eventual::make_exceptional_future<InnerType>(std::make_exception_ptr(exception)));
    }
 
    template<class Allocator>
    static T MakeCompleteFuture(const Allocator& alloc)
    {
-      auto promise = eventual::Promise<InnerType>(std::allocator_arg_t(), alloc);
-      promise.Set_Exception(std::make_exception_ptr(Anonymous()));
+      auto promise = eventual::promise<InnerType>(std::allocator_arg_t(), alloc);
+      promise.set_exception(std::make_exception_ptr(Anonymous()));
 
-      return T(promise.Get_Future());
+      return T(promise.get_future());
    }
 
    T MakeIncompleteFuture()
    {
-      _incompletePromises.emplace_back(eventual::Promise<InnerType>());
-      return T(_incompletePromises.back().Get_Future());
+      _incompletePromises.emplace_back(eventual::promise<InnerType>());
+      return T(_incompletePromises.back().get_future());
    }
 
    static T MakeCompleteFuture()
@@ -58,18 +58,18 @@ protected:
       return T(MakeExceptionalFuture(Anonymous()));
    }
 
-   static eventual::Promise<InnerType> MakePromise()
+   static eventual::promise<InnerType> MakePromise()
    {
-      return eventual::Promise<InnerType>();
+      return eventual::promise<InnerType>();
    }
 
-   static void CompletePromise(eventual::Promise<InnerType>& promise)
+   static void CompletePromise(eventual::promise<InnerType>& promise)
    {
-      promise.Set_Exception(nullptr);
+      promise.set_exception(nullptr);
    }
 
 private:
-   std::vector<eventual::Promise<InnerType>> _incompletePromises;
+   std::vector<eventual::promise<InnerType>> _incompletePromises;
 
 };
 
@@ -81,7 +81,7 @@ TYPED_TEST_P(FutureTestPatterns, DefaultConstructorCreatesInvalidFuture)
    TypeParam future;
 
    // Assert
-   EXPECT_FALSE(future.Valid()) << "Future should not be valid after default construction.";
+   EXPECT_FALSE(future.valid()) << "Future should not be valid after default construction.";
 }
 
 TYPED_TEST_P(FutureTestPatterns, IsMoveConstructable)
@@ -93,8 +93,8 @@ TYPED_TEST_P(FutureTestPatterns, IsMoveConstructable)
    TypeParam moved(std::move(future));
 
    // Assert
-   EXPECT_FALSE(future.Valid()) << "Original future should be invalid after move.";
-   EXPECT_TRUE(moved.Valid()) << "Moved constructed future should valid";
+   EXPECT_FALSE(future.valid()) << "Original future should be invalid after move.";
+   EXPECT_TRUE(moved.valid()) << "Moved constructed future should valid";
 }
 
 TYPED_TEST_P(FutureTestPatterns, ReleasesSharedStateOnDestruction)
@@ -118,8 +118,8 @@ TYPED_TEST_P(FutureTestPatterns, IsMoveAssignable)
    auto moved = std::move(future);
 
    // Assert
-   EXPECT_FALSE(future.Valid()) << "Original future should be invalid after move.";
-   EXPECT_TRUE(moved.Valid()) << "Moved future should valid";
+   EXPECT_FALSE(future.valid()) << "Original future should be invalid after move.";
+   EXPECT_TRUE(moved.valid()) << "Moved future should valid";
 }
 
 TYPED_TEST_P(FutureTestPatterns, Get_ThrowsWhenFutureIsExceptional)
@@ -128,7 +128,7 @@ TYPED_TEST_P(FutureTestPatterns, Get_ThrowsWhenFutureIsExceptional)
    auto future = this->MakeExceptionalFuture(FutureTestException());
 
    // Act/Assert
-   EXPECT_THROW(future.Get(), FutureTestException) << "Get did not throw the expected exception for the exceptional state";
+   EXPECT_THROW(future.get(), FutureTestException) << "get did not throw the expected exception for the exceptional state";
 }
 
 TYPED_TEST_P(FutureTestPatterns, Get_ThrowsWhenFutureIsInvalid)
@@ -137,7 +137,7 @@ TYPED_TEST_P(FutureTestPatterns, Get_ThrowsWhenFutureIsInvalid)
    TypeParam future;
 
    // Act/Assert
-   EXPECT_THROW(future.Get(), std::future_error) << "Get did not throw an exception when the future state was invalid";
+   EXPECT_THROW(future.get(), std::future_error) << "get did not throw an exception when the future state was invalid";
 }
 
 TYPED_TEST_P(FutureTestPatterns, Wait_DoesNotBlockWhenFutureIsComplete)
@@ -154,7 +154,7 @@ TYPED_TEST_P(FutureTestPatterns, Wait_DoesNotBlockWhenFutureIsComplete)
       auto future = this->MakeCompleteFuture();
 
       // Act
-      future.Wait();
+      future.wait();
 
       lock_guard<mutex> l(m);
       waitComplete = true;
@@ -174,7 +174,7 @@ TYPED_TEST_P(FutureTestPatterns, Wait_BlocksUntilFutureIsComplete)
 
    // Arrange
    auto promise = this->MakePromise();
-   TypeParam future(promise.Get_Future());
+   TypeParam future(promise.get_future());
    bool waitStarted = false;
    bool waitComplete = false;
    condition_variable waiting;
@@ -187,7 +187,7 @@ TYPED_TEST_P(FutureTestPatterns, Wait_BlocksUntilFutureIsComplete)
       waitStarted = true;
       l.unlock();
       waiting.notify_all();
-      future.Wait();
+      future.wait();
 
       l.lock();
       waitComplete = true;
@@ -210,7 +210,7 @@ TYPED_TEST_P(FutureTestPatterns, Wait_ThrowsWhenFutureIsInvalid)
    TypeParam future;
 
    // Act/Assert
-   EXPECT_THROW(future.Wait(), std::future_error) << "Wait did not throw an exception when the future state was invalid";
+   EXPECT_THROW(future.wait(), std::future_error) << "Wait did not throw an exception when the future state was invalid";
 }
 
 TYPED_TEST_P(FutureTestPatterns, WaitFor_DoesNotBlockWhenFutureIsComplete)
@@ -228,7 +228,7 @@ TYPED_TEST_P(FutureTestPatterns, WaitFor_DoesNotBlockWhenFutureIsComplete)
       auto future = this->MakeCompleteFuture();
 
       // Act
-      waitStatus = future.Wait_For(chrono::seconds(100));
+      waitStatus = future.wait_for(chrono::seconds(100));
 
       lock_guard<mutex> l(m);
       waitComplete = true;
@@ -249,7 +249,7 @@ TYPED_TEST_P(FutureTestPatterns, WaitFor_BlocksUntilTimeout)
 
    // Arrange
    auto promise = this->MakePromise();
-   TypeParam future(promise.Get_Future());
+   TypeParam future(promise.get_future());
    condition_variable waiting;
    mutex m;
    bool waitComplete = false;
@@ -258,7 +258,7 @@ TYPED_TEST_P(FutureTestPatterns, WaitFor_BlocksUntilTimeout)
    thread waiter([&]()
    {
       // Act
-      waitStatus = future.Wait_For(chrono::milliseconds(100));
+      waitStatus = future.wait_for(chrono::milliseconds(100));
 
       lock_guard<mutex> l(m);
       waitComplete = true;
@@ -278,7 +278,7 @@ TYPED_TEST_P(FutureTestPatterns, WaitFor_ThrowsWhenFutureIsInvalid)
    TypeParam future;
 
    // Act/Assert
-   EXPECT_THROW(future.Wait_For(std::chrono::milliseconds(100)), std::future_error) << "Wait_For did not throw an exception when the future state was invalid";
+   EXPECT_THROW(future.wait_for(std::chrono::milliseconds(100)), std::future_error) << "Wait_For did not throw an exception when the future state was invalid";
 }
 
 TYPED_TEST_P(FutureTestPatterns, WaitUntil_DoesNotBlockWhenFutureIsComplete)
@@ -296,7 +296,7 @@ TYPED_TEST_P(FutureTestPatterns, WaitUntil_DoesNotBlockWhenFutureIsComplete)
       auto future = this->MakeCompleteFuture();
 
       // Act
-      waitStatus = future.Wait_Until(chrono::steady_clock::now() + chrono::seconds(100));
+      waitStatus = future.wait_until(chrono::steady_clock::now() + chrono::seconds(100));
 
       lock_guard<mutex> l(m);
       waitComplete = true;
@@ -317,7 +317,7 @@ TYPED_TEST_P(FutureTestPatterns, WaitUntil_BlocksUntilTimeout)
 
    // Arrange
    auto promise = this->MakePromise();
-   TypeParam future(promise.Get_Future());
+   TypeParam future(promise.get_future());
    condition_variable waiting;
    mutex m;
    bool waitComplete = false;
@@ -326,7 +326,7 @@ TYPED_TEST_P(FutureTestPatterns, WaitUntil_BlocksUntilTimeout)
    thread waiter([&]()
    {
       // Act
-      waitStatus = future.Wait_Until(chrono::steady_clock::now() + chrono::milliseconds(100));
+      waitStatus = future.wait_until(chrono::steady_clock::now() + chrono::milliseconds(100));
 
       lock_guard<mutex> l(m);
       waitComplete = true;
@@ -346,7 +346,7 @@ TYPED_TEST_P(FutureTestPatterns, WaitUntil_ThrowsWhenFutureIsInvalid)
    TypeParam future;
 
    // Act/Assert
-   EXPECT_THROW(future.Wait_Until(std::chrono::steady_clock::now() + std::chrono::milliseconds(100)), std::future_error) << "Wait_Until did not throw an exception when the future state was invalid";
+   EXPECT_THROW(future.wait_until(std::chrono::steady_clock::now() + std::chrono::milliseconds(100)), std::future_error) << "Wait_Until did not throw an exception when the future state was invalid";
 }
 
 TYPED_TEST_P(FutureTestPatterns, IsReady_ReturnsTrueWhenFutureIsComplete)
@@ -355,7 +355,7 @@ TYPED_TEST_P(FutureTestPatterns, IsReady_ReturnsTrueWhenFutureIsComplete)
    auto future = this->MakeCompleteFuture();
 
    // Act
-   auto result = future.Is_Ready();
+   auto result = future.is_ready();
 
    // Assert
    EXPECT_TRUE(result) << "Is_Ready returned the wrong result for an complete future.";
@@ -367,7 +367,7 @@ TYPED_TEST_P(FutureTestPatterns, IsReady_ReturnsFalseWhenFutureIsIncomplete)
    auto future = this->MakeIncompleteFuture();
 
    // Act
-   auto result = future.Is_Ready();
+   auto result = future.is_ready();
 
    // Assert
    EXPECT_FALSE(result) << "Is_Ready returned the wrong result for an incomplete future.";
@@ -379,7 +379,7 @@ TYPED_TEST_P(FutureTestPatterns, IsReady_ReturnsFalseWhenFutureIsInvalid)
    TypeParam future;
 
    // Act
-   auto result = future.Is_Ready();
+   auto result = future.is_ready();
 
    // Assert
    EXPECT_FALSE(result) << "Is_Ready returned the wrong result for an invalid future.";
@@ -391,10 +391,10 @@ TYPED_TEST_P(FutureTestPatterns, Then_CallsContinuationWhenExceptionallyComplete
    auto future = this->MakeExceptionalFuture(FutureTestException());
 
    // Act
-   future.Then([](auto f)
+   future.then([](auto f)
    {
       // Assert
-      EXPECT_THROW(f.Get(), FutureTestException);
+      EXPECT_THROW(f.get(), FutureTestException);
    });
 }
 
@@ -403,15 +403,15 @@ TYPED_TEST_P(FutureTestPatterns, Then_CallsContinuationAfterExceptionallyComplet
 {
    // Arrange
    auto promise = this->MakePromise();
-   TypeParam future(promise.Get_Future());
+   TypeParam future(promise.get_future());
 
    // Act
-   future.Then([](auto f)
+   future.then([](auto f)
    {
       // Assert
-      EXPECT_THROW(f.Get(), FutureTestException);
+      EXPECT_THROW(f.get(), FutureTestException);
    });
-   promise.Set_Exception(std::make_exception_ptr(FutureTestException()));
+   promise.set_exception(std::make_exception_ptr(FutureTestException()));
 }
 
 TYPED_TEST_P(FutureTestPatterns, Then_ThrowsWhenFutureIsInvalid)
@@ -420,7 +420,7 @@ TYPED_TEST_P(FutureTestPatterns, Then_ThrowsWhenFutureIsInvalid)
    TypeParam future;
 
    // Act/Assert
-   EXPECT_THROW(future.Then([](auto) { }), std::future_error) << "Future::Then allowed registering a continuation on an invalid Future.";
+   EXPECT_THROW(future.then([](auto) { }), std::future_error) << "Future::then allowed registering a continuation on an invalid Future.";
 }
 
 TYPED_TEST_P(FutureTestPatterns, Then_ReturnsFutureWithCapturedExceptionOfContinuation)
@@ -429,13 +429,13 @@ TYPED_TEST_P(FutureTestPatterns, Then_ReturnsFutureWithCapturedExceptionOfContin
    auto future = this->MakeCompleteFuture();
 
    // Act
-   auto continuation = future.Then([](auto)
+   auto continuation = future.then([](auto)
    {
       throw FutureTestException();
    });
 
    // Assert
-   EXPECT_THROW(continuation.Get(), FutureTestException) << "Continuation did not capture the unhandled exception.";
+   EXPECT_THROW(continuation.get(), FutureTestException) << "Continuation did not capture the unhandled exception.";
 }
 
 TYPED_TEST_P(FutureTestPatterns, Then_ReturnsFutureWithCompletedNestedFuturesException)
@@ -444,13 +444,13 @@ TYPED_TEST_P(FutureTestPatterns, Then_ReturnsFutureWithCompletedNestedFuturesExc
    auto future = this->MakeExceptionalFuture(FutureTestException());
 
    // Act
-   auto unwrapped = future.Then([this](auto)
+   auto unwrapped = future.then([this](auto)
    {
       return this->MakeExceptionalFuture(FutureTestException());
    });
 
    // Assert
-   EXPECT_THROW(unwrapped.Get(), FutureTestException) << "Future::Then failed to unwrap a nested future and return its exception.";
+   EXPECT_THROW(unwrapped.get(), FutureTestException) << "Future::then failed to unwrap a nested future and return its exception.";
 }
 
 TYPED_TEST_P(FutureTestPatterns, Then_ReturnsFutureWithNestedFuturesExceptionWhenComplete)
@@ -458,49 +458,49 @@ TYPED_TEST_P(FutureTestPatterns, Then_ReturnsFutureWithNestedFuturesExceptionWhe
    using namespace eventual;
    
    // Arrange
-   Promise<void> promise;
-   auto outerFuture = promise.Get_Future();
+   promise<void> promise;
+   auto outerFuture = promise.get_future();
 
    // Act
-   auto unwrapped = outerFuture.Then([this](auto)
+   auto unwrapped = outerFuture.then([this](auto)
    {
       return this->MakeExceptionalFuture(FutureTestException());
    });
-   promise.Set_Value();
+   promise.set_value();
 
    // Assert
-   EXPECT_THROW(unwrapped.Get(), FutureTestException) << "Future::Then failed to unwrap a nested future and return its exception.";
+   EXPECT_THROW(unwrapped.get(), FutureTestException) << "Future::then failed to unwrap a nested future and return its exception.";
 }
 
-TYPED_TEST_P(FutureTestPatterns, Then_ReturnsFutureWithNoStateExceptionWhenInnerFutureHasNoState)
+TYPED_TEST_P(FutureTestPatterns, Then_ReturnsFutureWithBrokenPromiseExceptionWhenInnerFutureHasNoState)
 {
    using namespace eventual;
    
    // Arrange
-   Promise<void> promise;
-   auto outerFuture = promise.Get_Future();
+   promise<void> promise;
+   auto outerFuture = promise.get_future();
 
    // Act
-   auto unwrapped = outerFuture.Then([this](auto)
+   auto unwrapped = outerFuture.then([this](auto)
    {
       auto future = this->MakeCompleteFuture();
       TypeParam moved(std::move(future));
       
       return future;
    });
-   promise.Set_Value();
+   promise.set_value();
 
    // Assert
 
    try
    {
-      unwrapped.Get();
-      FAIL() << "Future::Then failed to throw an exception";
+      unwrapped.get();
+      FAIL() << "Future::then failed to throw an exception";
    }
    catch (const future_error& e)
    {
       
-      EXPECT_EQ(future_errc::no_state, e.code()) << "Future::Then failed to unwrap a nested future and return a no-state exception.";
+      EXPECT_EQ(future_errc::broken_promise, e.code()) << "Future::then failed to unwrap a nested future and return a broken-promise exception.";
    }
 }
 
@@ -530,4 +530,4 @@ REGISTER_TYPED_TEST_CASE_P(FutureTestPatterns,
                            Then_ReturnsFutureWithCapturedExceptionOfContinuation,
                            Then_ReturnsFutureWithCompletedNestedFuturesException,
                            Then_ReturnsFutureWithNestedFuturesExceptionWhenComplete,
-                           Then_ReturnsFutureWithNoStateExceptionWhenInnerFutureHasNoState);
+                           Then_ReturnsFutureWithBrokenPromiseExceptionWhenInnerFutureHasNoState);
