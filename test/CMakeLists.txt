@@ -31,7 +31,8 @@ if(MSVC)
    include_directories($<$<CONFIG:Debug>:${GTEST_INCLUDE_DEBUG}> $<$<CONFIG:Release>:${GTEST_INCLUDE_RELEASE}>)
    
 else()
-   include(${CMAKE_SOURCE_DIR}/conanbuildinfo.cmake)
+   set(CONAN_SYSTEM_INCLUDES True)
+   include(${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)
    conan_basic_setup()
 endif()
 
