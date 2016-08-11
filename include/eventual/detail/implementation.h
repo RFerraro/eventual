@@ -623,7 +623,7 @@ namespace eventual
                 TPrimaryState::SetCallback(std::forward<TCallback>(callback));
             }
 
-            polymorphic_allocator<TPrimaryState> Get_Allocator()
+            decltype(auto) Get_Allocator()
             {
                 return TPrimaryState::Get_Allocator();
             }

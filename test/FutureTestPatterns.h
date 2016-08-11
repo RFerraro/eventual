@@ -78,7 +78,7 @@ TYPED_TEST_CASE_P(FutureTestPatterns);
 TYPED_TEST_P(FutureTestPatterns, DefaultConstructorCreatesInvalidFuture)
 {
    // Arrange/Act
-   TypeParam future;
+   TypeParam future { }; // because gcov... 
 
    // Assert
    EXPECT_FALSE(future.valid()) << "Future should not be valid after default construction.";

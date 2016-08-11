@@ -84,8 +84,6 @@ namespace eventual
         template<class TPromise>
         future(const TPromise& promise, detail::enable_if_not_same_t<future, TPromise, int> = 0)
             : Base(promise) { }
-
-        future(SharedState&& other) : Base(std::forward<SharedState>(other)) { }
     };
 
     template<class RType>
@@ -122,10 +120,7 @@ namespace eventual
 
         template<class TPromise>
         future(const TPromise& promise, detail::enable_if_not_same_t<future, TPromise, int> = 0)
-            : Base(promise)
-        { }
-
-        future(SharedState&& other) : Base(std::forward<SharedState>(other)) { }
+            : Base(promise) { }
     };
 
     template<>
@@ -162,10 +157,7 @@ namespace eventual
 
         template<class TPromise>
         future(const TPromise& promise, detail::enable_if_not_same_t<future, TPromise, int> = 0)
-            : Base(promise)
-        { }
-
-        future(SharedState&& other) : Base(std::forward<SharedState>(other)) { }
+            : Base(promise) { }
     };
 
     template<class R>
@@ -266,9 +258,6 @@ namespace eventual
         {
             return Base::GetResult();
         }
-
-    private:
-        shared_future(SharedState&& other) : Base(std::forward<SharedState>(other)) { }
     };
 
     template<class R>
@@ -298,9 +287,6 @@ namespace eventual
         {
             return Base::GetResult();
         }
-
-    private:
-        shared_future(SharedState&& other) : Base(std::forward<SharedState>(other)) { }
     };
 
     template<>
@@ -331,9 +317,6 @@ namespace eventual
         {
             Base::GetResult();
         }
-
-    private:
-        shared_future(SharedState&& other) : Base(std::forward<SharedState>(other)) { }
     };
 
     template<class R, class... ArgTypes>

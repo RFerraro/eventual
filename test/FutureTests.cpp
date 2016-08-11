@@ -477,3 +477,27 @@ TEST(FutureTest_Void, Then_UnwrapsAndReturnsNestedVoidWhenComplete)
    // Assert
    EXPECT_TRUE(continuationCalled) << "Future::then failed to return the unwrapped continuation..";
 }
+
+TEST(FutureTest_Void, Then_UnwrapsAndReturnsDeeplyNestedFutureWhenComplete)
+{
+    // Arrange
+    auto level1 = make_ready_future();
+    auto level2 = make_ready_future(std::move(level1));
+    auto level3 = make_ready_future(std::move(level2));
+
+    promise<future<future<future<void>>>> promise;
+    auto future = promise.get_future();
+    bool continuationCalled = false;
+
+    // Act
+    auto unwrapped = future.then([&continuationCalled](auto f)
+    {
+        f.get();
+        continuationCalled = true;
+    });
+    promise.set_value(std::move(level3));
+    unwrapped.get();
+
+    // Assert
+    EXPECT_TRUE(continuationCalled) << "Future::then failed to return the unwrapped continuation..";
+}

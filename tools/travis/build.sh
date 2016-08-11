@@ -20,7 +20,7 @@ conan_data_cache="/tmp/conan"
 
 #docker image paths
 docker_build_path="/usr/src/eventual/build"
-docker_source_path="/usr/src/eventual/src"
+docker_source_path="/usr/src/eventual"
 docker_conan_data="/tmp/conan"
 docker_build_script="${docker_source_path}/tools/travis/build-in-docker.sh"
 
@@ -44,7 +44,7 @@ echo "invoking ${docker_image} with command: ${docker_build_script} ${script_opt
         -it \
         --rm \
         --privileged \
-        -v "${TRAVIS_BUILD_DIR}":$docker_source_path:ro \
+        -v "${TRAVIS_BUILD_DIR}":$docker_source_path \
         -v $conan_data_cache:$docker_conan_data \
         -e COVERALLS_REPO_TOKEN="${COVERALLS_REPO_TOKEN}" \
         $docker_image bash -ci "${docker_build_script} ${script_options}"
