@@ -220,7 +220,7 @@ TYPED_TEST_P(FutureTestPatterns, WaitFor_DoesNotBlockWhenFutureIsComplete)
    condition_variable waiting;
    mutex m;
    bool waitComplete = false;
-   eventual::future_status waitStatus = eventual::future_status::timeout;
+   std::future_status waitStatus = std::future_status::timeout;
 
    thread waiter([&]()
    {
@@ -240,7 +240,7 @@ TYPED_TEST_P(FutureTestPatterns, WaitFor_DoesNotBlockWhenFutureIsComplete)
    auto result = waiting.wait_for(lock, chrono::seconds(30), [&waitComplete]() { return waitComplete; });
    waiter.join();
    EXPECT_TRUE(result) << "Future::Wait_for blocked on an already complete Future.";
-   EXPECT_EQ(eventual::future_status::ready, waitStatus);
+   EXPECT_EQ(std::future_status::ready, waitStatus);
 }
 
 TYPED_TEST_P(FutureTestPatterns, WaitFor_BlocksUntilTimeout)
@@ -253,7 +253,7 @@ TYPED_TEST_P(FutureTestPatterns, WaitFor_BlocksUntilTimeout)
    condition_variable waiting;
    mutex m;
    bool waitComplete = false;
-   eventual::future_status waitStatus = eventual::future_status::ready;
+   std::future_status waitStatus = std::future_status::ready;
 
    thread waiter([&]()
    {
@@ -269,7 +269,7 @@ TYPED_TEST_P(FutureTestPatterns, WaitFor_BlocksUntilTimeout)
    unique_lock<mutex> lock(m);
    waiting.wait_for(lock, chrono::seconds(1), [&waitComplete]() { return waitComplete; });
    waiter.join();
-   EXPECT_EQ(eventual::future_status::timeout, waitStatus) << "Future::Wait_for failed to timeout.";
+   EXPECT_EQ(std::future_status::timeout, waitStatus) << "Future::Wait_for failed to timeout.";
 }
 
 TYPED_TEST_P(FutureTestPatterns, WaitFor_ThrowsWhenFutureIsInvalid)
@@ -288,7 +288,7 @@ TYPED_TEST_P(FutureTestPatterns, WaitUntil_DoesNotBlockWhenFutureIsComplete)
    condition_variable waiting;
    mutex m;
    bool waitComplete = false;
-   eventual::future_status waitStatus = eventual::future_status::timeout;
+   std::future_status waitStatus = std::future_status::timeout;
 
    thread waiter([&]()
    {
@@ -308,7 +308,7 @@ TYPED_TEST_P(FutureTestPatterns, WaitUntil_DoesNotBlockWhenFutureIsComplete)
    auto result = waiting.wait_for(lock, chrono::seconds(30), [&waitComplete]() { return waitComplete; });
    waiter.join();
    EXPECT_TRUE(result) << "Future::Wait_Until blocked on an already complete Future.";
-   EXPECT_EQ(eventual::future_status::ready, waitStatus);
+   EXPECT_EQ(std::future_status::ready, waitStatus);
 }
 
 TYPED_TEST_P(FutureTestPatterns, WaitUntil_BlocksUntilTimeout)
@@ -321,7 +321,7 @@ TYPED_TEST_P(FutureTestPatterns, WaitUntil_BlocksUntilTimeout)
    condition_variable waiting;
    mutex m;
    bool waitComplete = false;
-   eventual::future_status waitStatus = eventual::future_status::ready;
+   std::future_status waitStatus = std::future_status::ready;
 
    thread waiter([&]()
    {
@@ -337,7 +337,7 @@ TYPED_TEST_P(FutureTestPatterns, WaitUntil_BlocksUntilTimeout)
    unique_lock<mutex> lock(m);
    waiting.wait_for(lock, chrono::seconds(1), [&waitComplete]() { return waitComplete; });
    waiter.join();
-   EXPECT_EQ(eventual::future_status::timeout, waitStatus) << "Future::Wait_Until failed to timeout.";
+   EXPECT_EQ(std::future_status::timeout, waitStatus) << "Future::Wait_Until failed to timeout.";
 }
 
 TYPED_TEST_P(FutureTestPatterns, WaitUntil_ThrowsWhenFutureIsInvalid)
@@ -497,10 +497,10 @@ TYPED_TEST_P(FutureTestPatterns, Then_ReturnsFutureWithBrokenPromiseExceptionWhe
       unwrapped.get();
       FAIL() << "Future::then failed to throw an exception";
    }
-   catch (const future_error& e)
+   catch (const std::future_error& e)
    {
       
-      EXPECT_EQ(future_errc::broken_promise, e.code()) << "Future::then failed to unwrap a nested future and return a broken-promise exception.";
+      EXPECT_EQ(std::future_errc::broken_promise, e.code()) << "Future::then failed to unwrap a nested future and return a broken-promise exception.";
    }
 }
 
