@@ -1,93 +1,128 @@
-cmake_minimum_required(VERSION 2.8.0)
+cmake_minimum_required(VERSION 3.0)
 project(test)
 
-#set(PROJECT_INCLUDE_DIR ${PROJECT_SOURCE_DIR}/include)
-#include_directories(include)
+if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+   set(conan_arch "x86_64")
+else()
+   set(conan_arch "x86")
+endif()
 
-if(MSVC)
+if(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
+   set(conan_compiler "Visual Studio")
+elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+   set(conan_compiler "clang")
+elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+   set(conan_compiler "gcc")
+else()
+   set(conan_compiler ${CMAKE_CXX_COMPILER_ID})
+   message(WARNING "WARNING: connan.io may not support compiler: ${CMAKE_CXX_COMPILER_ID}")
+endif()
+
+set(test_sources
+    ./EventualTests.cpp
+    ./FutureTests.cpp
+    ./PackagedTaskTests.cpp
+    ./PolymorphicAllocatorTests.cpp
+    ./PromiseTests.cpp
+    ./ResourceAdapterTests.cpp
+    ./SharedFutureTests.cpp
+    ./StrongPolymorphicAllocatorTests.cpp
+    ./test.cpp
+    ./stdafx.cpp
+    ./stdafx.h
+    ./BasicAllocator.h
+    ./NullResource.h
+    ./FutureTestPatterns.h
+    ./NonCopyable.h)
+
+add_executable(Test ${test_sources})
+
+target_link_libraries(Test PUBLIC eventual_lib)
+target_include_directories(Test PUBLIC ../)
+
+if(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
+   # Because Conan.io (0.10.0) lives in a fantasy world where they only think that visual studio only needs a "single-configuration"...
+
+   add_custom_command(
+      TARGET Test PRE_BUILD
+      COMMAND conan install ${CMAKE_SOURCE_DIR} -s arch=${conan_arch} -s build_type=Release -s compiler="${conan_compiler}" -s compiler.runtime=MT -build=missing
+      COMMAND cmake -E rename conanbuildinfo.cmake conanbuildinfo_release.cmake
+      )
    
-   if(CMAKE_SIZEOF_VOID_P EQUAL 8)
-      # 64bit build
-      include(${CMAKE_SOURCE_DIR}/conanbuildinfo_release_x86_64.cmake)
-   else()
-      include(${CMAKE_SOURCE_DIR}/conanbuildinfo_release_x86.cmake)
-   endif()
+   add_custom_command(
+      TARGET Test PRE_BUILD
+      COMMAND conan install ${CMAKE_SOURCE_DIR} -s arch=${conan_arch} -s build_type=Debug -s compiler="${conan_compiler}" -s compiler.runtime=MTd -build=missing
+      COMMAND cmake -E rename conanbuildinfo.cmake conanbuildinfo_debug.cmake 
+      )
    
+   include(${CMAKE_CURRENT_BINARY_DIR}/conanbuildinfo_release.cmake)
    set(GTEST_INCLUDE_RELEASE ${CONAN_INCLUDE_DIRS_GTEST})
    set(GTEST_LIBDIR_RELEASE ${CONAN_LIB_DIRS_GTEST})
    set(GTEST_LIBS_RELEASE ${CONAN_LIBS_GTEST})
    
-   if(CMAKE_SIZEOF_VOID_P EQUAL 8)
-      # 64bit build
-      include(${CMAKE_SOURCE_DIR}/conanbuildinfo_debug_x86_64.cmake)
-   else()
-      include(${CMAKE_SOURCE_DIR}/conanbuildinfo_debug_x86.cmake)
-   endif()
-      
+   include(${CMAKE_CURRENT_BINARY_DIR}/conanbuildinfo_debug.cmake)
    set(GTEST_INCLUDE_DEBUG ${CONAN_INCLUDE_DIRS_GTEST})
    set(GTEST_LIBDIR_DEBUG ${CONAN_LIB_DIRS_GTEST})
    set(GTEST_LIBS_DEBUG ${CONAN_LIBS_GTEST})
+
+   target_include_directories(Test SYSTEM PUBLIC $<$<CONFIG:Debug>:${GTEST_INCLUDE_DEBUG}> $<$<CONFIG:Release>:${GTEST_INCLUDE_RELEASE}>)
+   target_link_libraries(Test PUBLIC "$<$<CONFIG:Debug>:${GTEST_LIBS_RELEASE}>" "$<$<CONFIG:Release>:${GTEST_LIBS_DEBUG}>")
+   set_target_properties(Test PROPERTIES LINK_FLAGS_DEBUG "/LIBPATH:\"${GTEST_LIBDIR_DEBUG}\"")
+   set_target_properties(Test PROPERTIES LINK_FLAGS_RELEASE "/LIBPATH:\"${GTEST_LIBDIR_RELEASE}\"")
    
-   include_directories($<$<CONFIG:Debug>:${GTEST_INCLUDE_DEBUG}> $<$<CONFIG:Release>:${GTEST_INCLUDE_RELEASE}>)
    
+   target_compile_options(Test PUBLIC
+                          "/W4" 
+                          "/WX" 
+                          "$<$<EQUAL:${CMAKE_SIZEOF_VOID_P},8>:/bigobj>" 
+                          "$<$<CONFIG:Debug>:/MTd>" 
+                          "$<$<CONFIG:Release>:/MT>")
+   set_target_properties(Test PROPERTIES LINK_FLAGS "/WX")
 else()
+   #clang/gcc...
+   
+   add_custom_command(
+      TARGET Test PRE_BUILD
+      COMMAND conan install ${CMAKE_SOURCE_DIR} -s arch=${conan_arch} -s build_type=${CMAKE_BUILD_TYPE} -s compiler="${conan_compiler}" -s compiler.libcxx="libstdc++11" -build=missing
+      )
+
    set(CONAN_SYSTEM_INCLUDES True)
-   include(${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)
+   include(${CMAKE_CURRENT_BINARY_DIR}/conanbuildinfo.cmake)
    conan_basic_setup()
+   
+   target_link_libraries(Test PUBLIC ${CONAN_LIBS})
+   
 endif()
 
-list(APPEND TEST_SOURCES EventualTests.cpp)
-list(APPEND TEST_SOURCES FutureTests.cpp)
-list(APPEND TEST_SOURCES PackagedTaskTests.cpp)
-list(APPEND TEST_SOURCES PolymorphicAllocatorTests.cpp)
-list(APPEND TEST_SOURCES PromiseTests.cpp)
-list(APPEND TEST_SOURCES ResourceAdapterTests.cpp)
-list(APPEND TEST_SOURCES SharedFutureTests.cpp)
-list(APPEND TEST_SOURCES StrongPolymorphicAllocatorTests.cpp)
-list(APPEND TEST_SOURCES test.cpp)
-
-if(MSVC)
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
    
-   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /Yu\"stdafx.h\"")
-
-   set_source_files_properties(stdafx.cpp
-      PROPERTIES COMPILE_FLAGS "/Ycstdafx.h")
-      
-   foreach(src_file ${TEST_SOURCES})
-      set_source_files_properties(${src_file}
-         PROPERTIES COMPILE_FLAGS "/Yustdafx.h")
-   endforeach()
+   target_compile_options(Test PUBLIC
+                          "-std=c++14" 
+                          "-Werror" 
+                          "-Wall"
+                          "-Wextra"
+                          "-Wunreachable-code"
+                          "$<$<CONFIG:Debug>:-g>"
+                          "$<$<CONFIG:Debug>:-O0>"
+                          "$<$<CONFIG:Debug>:--coverage>")
+   set_target_properties(Test PROPERTIES LINK_FLAGS_DEBUG "--coverage")
    
-   set(CMAKE_EXE_LINKER_FLAGS_DEBUG "${CMAKE_EXE_LINKER_FLAGS_DEBUG} /LIBPATH:\"${GTEST_LIBDIR_DEBUG}\"")
-   set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} /LIBPATH:\"${GTEST_LIBDIR_RELEASE}\"")
+elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
 
-endif()
-
-list(APPEND TEST_SOURCES stdafx.cpp)
-list(APPEND TEST_SOURCES stdafx.h)
-list(APPEND TEST_SOURCES BasicAllocator.h)
-list(APPEND TEST_SOURCES NullResource.h)
-list(APPEND TEST_SOURCES FutureTestPatterns.h)
-list(APPEND TEST_SOURCES NonCopyable.h)
-list(APPEND TEST_SOURCES "../include/eventual/eventual.h")
-list(APPEND TEST_SOURCES "../include/eventual/detail/allocation.h")
-list(APPEND TEST_SOURCES "../include/eventual/detail/implementation.h")
-list(APPEND TEST_SOURCES "../include/eventual/detail/traits.h")
-list(APPEND TEST_SOURCES "../include/eventual/detail/utility.h")
-
-add_executable(Test ${TEST_SOURCES})
-
-if(MSVC)
-   #listing generates duplicates for some reason...
-   foreach(lib_item ${GTEST_LIBS_RELEASE})
-      target_link_libraries(Test optimized ${lib_item})
-   endforeach()
-
-   #listing generates duplicates for some reason...
-   foreach(lib_item ${GTEST_LIBS_DEBUG})
-      target_link_libraries(Test debug ${lib_item})
-   endforeach()
-else()
-   target_link_libraries(Test ${CONAN_LIBS})
+   target_compile_options(Test PUBLIC
+                          "-std=c++14" 
+                          "-Werror" 
+                          "-Wall"
+                          "-Wextra"
+                          "-Wunreachable-code"
+                          "$<$<CONFIG:Debug>:-g>"
+                          "$<$<CONFIG:Debug>:-O0>"
+                          "$<$<CONFIG:Debug>:--coverage>"
+                          "$<$<CONFIG:Debug>:-fno-inline>"
+                          "$<$<CONFIG:Debug>:-fno-inline-small-functions>"
+                          "$<$<CONFIG:Debug>:-fno-default-inline>"
+                          )
+   set_target_properties(Test PROPERTIES LINK_FLAGS_DEBUG "--coverage")
+   
 endif()
 

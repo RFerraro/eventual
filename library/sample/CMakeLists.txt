@@ -1,27 +1,34 @@
-cmake_minimum_required(VERSION 2.8.0)
+cmake_minimum_required(VERSION 3.0)
 project(sample)
 
-#set(PROJECT_INCLUDE_DIR ${PROJECT_SOURCE_DIR}/include)
-#include_directories(include)
+set(sample_sources
+    ./sample.cpp
+    ./stdafx.h
+    ./stdafx.cpp)
 
-#set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
+add_executable(Sample ${sample_sources})
 
-list(APPEND SOURCES sample.cpp)
-list(APPEND SOURCES stdafx.h)
-list(APPEND SOURCES "../../include/eventual/eventual.h")
-list(APPEND SOURCES "../../include/eventual/detail/allocation.h")
-list(APPEND SOURCES "../../include/eventual/detail/implementation.h")
-list(APPEND SOURCES "../../include/eventual/detail/traits.h")
-list(APPEND SOURCES "../../include/eventual/detail/utility.h")
+target_link_libraries(Sample PUBLIC eventual_lib)
+target_include_directories(Sample PUBLIC ../)
 
-if(MSVC)
+if(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
 
-   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /Yu\"stdafx.h\"")
+   target_compile_options(Sample PUBLIC
+                          "/W4" 
+                          "/WX" 
+                          "$<$<EQUAL:${CMAKE_SIZEOF_VOID_P},8>:/bigobj>" 
+                          "$<$<CONFIG:Debug>:/MTd>" 
+                          "$<$<CONFIG:Release>:/MT>")
+   set_target_properties(Sample PROPERTIES LINK_FLAGS "/WX")
 
-   set_source_files_properties(stdafx.cpp PROPERTIES COMPILE_FLAGS "/Ycstdafx.h")
-   set_source_files_properties(sample.cpp PROPERTIES COMPILE_FLAGS "/Yustdafx.h")
+elseif((CMAKE_CXX_COMPILER_ID MATCHES "Clang") OR (CMAKE_CXX_COMPILER_ID MATCHES "GNU"))
+   
+   target_compile_options(Sample PUBLIC
+                          "-std=c++14" 
+                          "-Werror" 
+                          "-Wall"
+                          "-Wextra"
+                          "-Wunreachable-code")
+   
 endif()
 
-list(APPEND SOURCES stdafx.cpp)
-
-add_executable(Sample ${SOURCES})
