@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.0)
 project(sample)
 
+set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+
 set(sample_sources
     ./sample.cpp
     ./stdafx.h
@@ -31,4 +33,10 @@ elseif((CMAKE_CXX_COMPILER_ID MATCHES "Clang") OR (CMAKE_CXX_COMPILER_ID MATCHES
                           "-Wunreachable-code")
    
 endif()
+
+install(
+        TARGETS
+            Sample
+        DESTINATION bin
+        )
 

@@ -1,10 +1,14 @@
 cmake_minimum_required(VERSION 3.0)
 project(test)
 
+set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+
 if(CMAKE_SIZEOF_VOID_P EQUAL 8)
    set(conan_arch "x86_64")
+   set(is_x86_64 1)
 else()
    set(conan_arch "x86")
+   set(is_x86_64 0)
 endif()
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
@@ -16,6 +20,69 @@ elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
 else()
    set(conan_compiler ${CMAKE_CXX_COMPILER_ID})
    message(WARNING "WARNING: connan.io may not support compiler: ${CMAKE_CXX_COMPILER_ID}")
+endif()
+
+if(CMAKE_CONFIGURATION_TYPES) #Multi-Configuration
+
+   # Because Conan.io (0.10.0) lives in a fantasy world where they only think that visual studio only needs a "single-configuration"...
+   execute_process(
+      COMMAND conan install "${CMAKE_SOURCE_DIR}" -s arch=${conan_arch} -s build_type=Release -s compiler=${conan_compiler} -s compiler.runtime=MT -build=missing
+      WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+      RESULT_VARIABLE conan_result
+      )
+   
+   if(NOT conan_result EQUAL 0)
+      message(FATAL_ERROR "Conan.io failed to install this project's Release dependencies, error: ${conan_result}")
+   endif()
+   
+   execute_process(
+      COMMAND ${CMAKE_COMMAND} -E rename conanbuildinfo.cmake conanbuildinfo_release.cmake
+      WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+      RESULT_VARIABLE rename_result
+      )
+   
+   if(NOT rename_result EQUAL 0)
+      message(FATAL_ERROR "Cmake failed to rename this project's Release dependencies import file, error: ${rename_result}")
+   endif()
+      
+   execute_process(
+      COMMAND conan install "${CMAKE_SOURCE_DIR}" -s arch=${conan_arch} -s build_type=Debug -s compiler=${conan_compiler} -s compiler.runtime=MTd -build=missing
+      WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+      RESULT_VARIABLE conan_result
+      )
+      
+   if(NOT conan_result EQUAL 0)
+      message(FATAL_ERROR "Conan.io failed to install this project's Debug dependencies, error: ${conan_result}")
+   endif()
+   
+   execute_process(
+      COMMAND ${CMAKE_COMMAND} -E rename conanbuildinfo.cmake conanbuildinfo_debug.cmake
+      WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+      RESULT_VARIABLE rename_result
+      )
+      
+   if(NOT rename_result EQUAL 0)
+      message(FATAL_ERROR "Cmake failed to rename this project's Debug dependencies import file, error: ${rename_result}")
+   endif()
+      
+else()
+   
+   execute_process(
+      TARGET Test PRE_BUILD
+      COMMAND conan install ${CMAKE_SOURCE_DIR} -s arch=${conan_arch} -s build_type=${CMAKE_BUILD_TYPE} -s compiler=${conan_compiler} -s compiler.libcxx="libstdc++11" -build=missing
+      WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+      RESULT_VARIABLE conan_result
+      )
+   
+   if(NOT conan_result EQUAL 0)
+      message(FATAL_ERROR "Conan.io failed to install this project's dependencies, error: ${conan_result}")
+   endif()
+      
+   #todo: link both paths the same...
+   set(CONAN_SYSTEM_INCLUDES True)
+   include(${CMAKE_CURRENT_BINARY_DIR}/conanbuildinfo.cmake)
+   conan_basic_setup()
+
 endif()
 
 set(test_sources
@@ -41,19 +108,6 @@ target_link_libraries(Test PUBLIC eventual_lib)
 target_include_directories(Test PUBLIC ../)
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
-   # Because Conan.io (0.10.0) lives in a fantasy world where they only think that visual studio only needs a "single-configuration"...
-
-   add_custom_command(
-      TARGET Test PRE_BUILD
-      COMMAND conan install ${CMAKE_SOURCE_DIR} -s arch=${conan_arch} -s build_type=Release -s compiler="${conan_compiler}" -s compiler.runtime=MT -build=missing
-      COMMAND cmake -E rename conanbuildinfo.cmake conanbuildinfo_release.cmake
-      )
-   
-   add_custom_command(
-      TARGET Test PRE_BUILD
-      COMMAND conan install ${CMAKE_SOURCE_DIR} -s arch=${conan_arch} -s build_type=Debug -s compiler="${conan_compiler}" -s compiler.runtime=MTd -build=missing
-      COMMAND cmake -E rename conanbuildinfo.cmake conanbuildinfo_debug.cmake 
-      )
    
    include(${CMAKE_CURRENT_BINARY_DIR}/conanbuildinfo_release.cmake)
    set(GTEST_INCLUDE_RELEASE ${CONAN_INCLUDE_DIRS_GTEST})
@@ -70,31 +124,17 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
    set_target_properties(Test PROPERTIES LINK_FLAGS_DEBUG "/LIBPATH:\"${GTEST_LIBDIR_DEBUG}\"")
    set_target_properties(Test PROPERTIES LINK_FLAGS_RELEASE "/LIBPATH:\"${GTEST_LIBDIR_RELEASE}\"")
    
-   
    target_compile_options(Test PUBLIC
                           "/W4" 
                           "/WX" 
-                          "$<$<EQUAL:${CMAKE_SIZEOF_VOID_P},8>:/bigobj>" 
+                          "$<$<BOOL:${is_x86_64}>:/bigobj>" 
                           "$<$<CONFIG:Debug>:/MTd>" 
                           "$<$<CONFIG:Release>:/MT>")
    set_target_properties(Test PROPERTIES LINK_FLAGS "/WX")
 else()
    #clang/gcc...
    
-   add_custom_command(
-      TARGET Test PRE_BUILD
-      COMMAND conan install ${CMAKE_SOURCE_DIR} -s arch=${conan_arch} -s build_type=${CMAKE_BUILD_TYPE} -s compiler="${conan_compiler}" -s compiler.libcxx="libstdc++11" -build=missing
-      )
-
-   set(CONAN_SYSTEM_INCLUDES True)
-   include(${CMAKE_CURRENT_BINARY_DIR}/conanbuildinfo.cmake)
-   conan_basic_setup()
-   
    target_link_libraries(Test PUBLIC ${CONAN_LIBS})
-   
-endif()
-
-if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
    
    target_compile_options(Test PUBLIC
                           "-std=c++14" 
@@ -107,22 +147,14 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
                           "$<$<CONFIG:Debug>:--coverage>")
    set_target_properties(Test PROPERTIES LINK_FLAGS_DEBUG "--coverage")
    
-elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+endif()
+
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
 
    target_compile_options(Test PUBLIC
-                          "-std=c++14" 
-                          "-Werror" 
-                          "-Wall"
-                          "-Wextra"
-                          "-Wunreachable-code"
-                          "$<$<CONFIG:Debug>:-g>"
-                          "$<$<CONFIG:Debug>:-O0>"
-                          "$<$<CONFIG:Debug>:--coverage>"
                           "$<$<CONFIG:Debug>:-fno-inline>"
                           "$<$<CONFIG:Debug>:-fno-inline-small-functions>"
                           "$<$<CONFIG:Debug>:-fno-default-inline>"
                           )
-   set_target_properties(Test PROPERTIES LINK_FLAGS_DEBUG "--coverage")
-   
 endif()
 
