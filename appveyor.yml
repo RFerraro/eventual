@@ -3,9 +3,6 @@ os: Visual Studio 2015
 configuration:
 - Debug
 - Release
-platform:
-- Win32
-- x64
 
 environment:
   PATH: C:\Python34;C:\Python34\Scripts;%PATH%
@@ -13,10 +10,8 @@ environment:
     secure: orvUIm+Uf35nZKLvGr/dDNampXA8v64mzFd2oXvKz5NlsbG4xaYPfhazp+57sk3y
     
   matrix:
-    - PLATFORM: Win32
-      GENERATOR: Visual Studio 14 2015
-    - PLATFORM: x64
-      GENERATOR: Visual Studio 14 2015 Win64
+    - GENERATOR: Visual Studio 14 2015
+    - GENERATOR: Visual Studio 14 2015 Win64
 
 cache:
 - C:\Users\AppVeyor\.conan -> cache.txt
@@ -25,7 +20,7 @@ cache:
 
 install:
 - ps: '.\tools\appveyor\install_opencppcoverage.ps1'
-- ps: &pip install conan
+- pip install conan
 
 before_build:
 - ps: Write-Host -ForegroundColor White (& cmake -Bbuild -H"." -G "$env:GENERATOR")
