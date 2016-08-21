@@ -1,4 +1,6 @@
 cmake_minimum_required(VERSION 3.0)
+
+include(CMakeParseArguments)
 project(test)
 
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
@@ -22,62 +24,94 @@ else()
    message(WARNING "WARNING: connan.io may not support compiler: ${CMAKE_CXX_COMPILER_ID}")
 endif()
 
-if(CMAKE_CONFIGURATION_TYPES) #Multi-Configuration
 
-   # Because Conan.io (0.10.0) lives in a fantasy world where they only think that visual studio only needs a "single-configuration"...
-   execute_process(
-      COMMAND conan install "${CMAKE_SOURCE_DIR}" -s arch=${conan_arch} -s build_type=Release -s compiler=${conan_compiler} -s compiler.runtime=MT -build=missing
-      WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-      RESULT_VARIABLE conan_result
-      )
+function(install_dependencies)
+   set(install_args SOURCE_DIR ARCH BUILD_TYPE COMPILER RUNTIME LIBCXX OUTPUT_FILE)
+   cmake_parse_arguments(install_dependencies "" "${install_args}" "" ${ARGN} )
    
-   if(NOT conan_result EQUAL 0)
-      message(FATAL_ERROR "Conan.io failed to install this project's Release dependencies, error: ${conan_result}")
-   endif()
-   
-   execute_process(
-      COMMAND ${CMAKE_COMMAND} -E rename conanbuildinfo.cmake conanbuildinfo_release.cmake
-      WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-      RESULT_VARIABLE rename_result
-      )
-   
-   if(NOT rename_result EQUAL 0)
-      message(FATAL_ERROR "Cmake failed to rename this project's Release dependencies import file, error: ${rename_result}")
-   endif()
+   if(NOT install_dependencies_RUNTIME STREQUAL "")
       
-   execute_process(
-      COMMAND conan install "${CMAKE_SOURCE_DIR}" -s arch=${conan_arch} -s build_type=Debug -s compiler=${conan_compiler} -s compiler.runtime=MTd -build=missing
-      WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-      RESULT_VARIABLE conan_result
-      )
-      
-   if(NOT conan_result EQUAL 0)
-      message(FATAL_ERROR "Conan.io failed to install this project's Debug dependencies, error: ${conan_result}")
-   endif()
+      execute_process(
+         COMMAND conan install 
+            "${install_dependencies_SOURCE_DIR}" 
+            -s arch=${install_dependencies_ARCH} 
+            -s build_type=${install_dependencies_BUILD_TYPE} 
+            -s compiler=${install_dependencies_COMPILER} 
+            -s compiler.runtime=${install_dependencies_RUNTIME} 
+            -build=missing
+         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+         RESULT_VARIABLE conan_result
+         )
+   elseif(NOT install_dependencies_LIBCXX STREQUAL "")
    
-   execute_process(
-      COMMAND ${CMAKE_COMMAND} -E rename conanbuildinfo.cmake conanbuildinfo_debug.cmake
-      WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-      RESULT_VARIABLE rename_result
-      )
-      
-   if(NOT rename_result EQUAL 0)
-      message(FATAL_ERROR "Cmake failed to rename this project's Debug dependencies import file, error: ${rename_result}")
-   endif()
-      
-else()
+      execute_process(
+         COMMAND conan install 
+            "${install_dependencies_SOURCE_DIR}" 
+            -s arch=${install_dependencies_ARCH} 
+            -s build_type=${install_dependencies_BUILD_TYPE} 
+            -s compiler=${install_dependencies_COMPILER}
+            -s compiler.libcxx="${install_dependencies_LIBCXX}"
+            -build=missing
+         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+         RESULT_VARIABLE conan_result
+         )    
    
-   execute_process(
-      TARGET Test PRE_BUILD
-      COMMAND conan install ${CMAKE_SOURCE_DIR} -s arch=${conan_arch} -s build_type=${CMAKE_BUILD_TYPE} -s compiler=${conan_compiler} -s compiler.libcxx="libstdc++11" -build=missing
-      WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-      RESULT_VARIABLE conan_result
-      )
+   endif()
    
    if(NOT conan_result EQUAL 0)
       message(FATAL_ERROR "Conan.io failed to install this project's dependencies, error: ${conan_result}")
    endif()
+   
+   if(NOT install_dependencies_OUTPUT_FILE STREQUAL "")
+   
+      execute_process(
+      COMMAND ${CMAKE_COMMAND} -E rename "conanbuildinfo.cmake" "${install_dependencies_OUTPUT_FILE}"
+      WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+      RESULT_VARIABLE rename_result
+      )
       
+      if(NOT rename_result EQUAL 0)
+         message(FATAL_ERROR "Cmake failed to rename this project's dependencies import file: \"conanbuildinfo.cmake\", to: \"${install_dependencies_OUTPUT_FILE}\"; error: ${rename_result}")
+      endif()
+      
+   endif()
+
+endfunction(install_dependencies)
+
+
+
+if(CMAKE_CONFIGURATION_TYPES) #Multi-Configuration
+
+   # Because Conan.io (0.10.0) lives in a fantasy world where they only think that visual studio only needs a "single-configuration"...
+   
+   install_dependencies(
+      SOURCE_DIR ${CMAKE_SOURCE_DIR}
+      ARCH ${conan_arch}
+      BUILD_TYPE "Release"
+      COMPILER ${conan_compiler}
+      RUNTIME "MT"
+      OUTPUT_FILE "conanbuildinfo_release.cmake"
+      )
+   
+   install_dependencies(
+      SOURCE_DIR ${CMAKE_SOURCE_DIR}
+      ARCH ${conan_arch}
+      BUILD_TYPE "Debug"
+      COMPILER ${conan_compiler}
+      RUNTIME "MTd"
+      OUTPUT_FILE "conanbuildinfo_debug.cmake"
+      )
+      
+else()
+
+   install_dependencies(
+      SOURCE_DIR ${CMAKE_SOURCE_DIR}
+      ARCH ${conan_arch}
+      BUILD_TYPE ${CMAKE_BUILD_TYPE}
+      COMPILER ${conan_compiler}
+      LIBCXX "libstdc++11"
+      )
+   
    #todo: link both paths the same...
    set(CONAN_SYSTEM_INCLUDES True)
    include(${CMAKE_CURRENT_BINARY_DIR}/conanbuildinfo.cmake)
