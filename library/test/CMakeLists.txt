@@ -29,7 +29,7 @@ function(install_dependencies)
    set(install_args SOURCE_DIR ARCH BUILD_TYPE COMPILER RUNTIME LIBCXX OUTPUT_FILE)
    cmake_parse_arguments(install_dependencies "" "${install_args}" "" ${ARGN} )
    
-   if(NOT install_dependencies_RUNTIME STREQUAL "")
+   if((DEFINED install_dependencies_RUNTIME) AND (NOT install_dependencies_RUNTIME STREQUAL ""))
       
       execute_process(
          COMMAND conan install 
@@ -42,7 +42,7 @@ function(install_dependencies)
          WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
          RESULT_VARIABLE conan_result
          )
-   elseif(NOT install_dependencies_LIBCXX STREQUAL "")
+   elseif((DEFINED install_dependencies_LIBCXX) AND (NOT install_dependencies_LIBCXX STREQUAL ""))
    
       execute_process(
          COMMAND conan install 
