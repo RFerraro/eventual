@@ -50,7 +50,7 @@ function(install_dependencies)
             -s arch=${install_dependencies_ARCH} 
             -s build_type=${install_dependencies_BUILD_TYPE} 
             -s compiler=${install_dependencies_COMPILER}
-            -s compiler.libcxx="${install_dependencies_LIBCXX}"
+            -s compiler.libcxx=${install_dependencies_LIBCXX}
             -build=missing
          WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
          RESULT_VARIABLE conan_result
