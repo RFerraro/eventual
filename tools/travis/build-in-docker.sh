@@ -88,7 +88,7 @@ make -j"$(nproc)"
 
 #todo: make check?
 echo "Running Tests..."
-./test/bin/Test
+./library/test/bin/Test
 
 if [ $ci_analyse_coverage -eq 1 ]; then 
 	
