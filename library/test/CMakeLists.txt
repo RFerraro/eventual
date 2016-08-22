@@ -62,7 +62,7 @@ function(install_dependencies)
       message(FATAL_ERROR "Conan.io failed to install this project's dependencies, error: ${conan_result}")
    endif()
    
-   if(NOT install_dependencies_OUTPUT_FILE STREQUAL "")
+   if((DEFINED install_dependencies_OUTPUT_FILE) AND (NOT install_dependencies_OUTPUT_FILE STREQUAL ""))
    
       execute_process(
       COMMAND ${CMAKE_COMMAND} -E rename "conanbuildinfo.cmake" "${install_dependencies_OUTPUT_FILE}"
