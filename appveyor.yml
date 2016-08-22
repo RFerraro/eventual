@@ -31,8 +31,6 @@ build:
   
 test_script:
 - ps: '.\tools\appveyor\run_tests.ps1'
-
-after_test:
 - ps: '.\tools\appveyor\post_coverage_results.ps1'
 
 #on_finish:
