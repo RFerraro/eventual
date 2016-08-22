@@ -139,7 +139,7 @@ set(test_sources
 add_executable(Test ${test_sources})
 
 target_link_libraries(Test PUBLIC eventual_lib)
-target_include_directories(Test PUBLIC ../)
+target_include_directories(Test PUBLIC ${CMAKE_SOURCE_DIR}/library)
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
    

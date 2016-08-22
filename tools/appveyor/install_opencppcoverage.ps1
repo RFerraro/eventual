@@ -1,4 +1,7 @@
-﻿$downloadUrl = "http://download-codeplex.sec.s-msft.com/Download/Release?ProjectName=opencppcoverage&DownloadId=1539055&FileTime=130975366571670000&Build=21031"
+#todo: convert this into a chocolatey package...
+
+$downloadUrl = "http://download-codeplex.sec.s-msft.com/Download/Release?ProjectName=opencppcoverage&DownloadId=1594912&FileTime=131138681432830000&Build=21031"
+
 $installerPath = [System.IO.Path]::Combine($Env:USERPROFILE, "Downloads", "OpenCppCoverageSetup.exe")
 $installPath = [System.IO.Path]::Combine(${Env:ProgramFiles}, "OpenCppCoverage")
 $openCppCoverageExe = [System.IO.Path]::Combine($installPath, "OpenCppCoverage.exe")

@@ -123,7 +123,7 @@ function Run-Tests
                 Start-Sleep -s 1
             }
 
-            Write-Host -ForegroundColor White "Coverage analysis complete, pushing coverage file."
+            Write-Host -ForegroundColor White "Coverage analysis complete, writing coverage file."
 
             $coverageName = ("test_coverage(" + $testConfiguration + ")")
             $coverageArchive = ($coverageName + ".zip")

@@ -8,7 +8,7 @@ if(CMAKE_CONFIGURATION_TYPES)
    set(CMAKE_CONFIGURATION_TYPES "Debug;Release" CACHE STRING "" FORCE)
 endif()
 
-set(CMAKE_INSTALL_PREFIX ${CMAKE_SOURCE_DIR}install CACHE STRING "" FORCE)
+set(CMAKE_INSTALL_PREFIX ${CMAKE_SOURCE_DIR}/install CACHE STRING "" FORCE)
 
 add_subdirectory(library/eventual)
 add_subdirectory(library/sample)
