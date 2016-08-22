@@ -3,30 +3,32 @@ os: Visual Studio 2015
 configuration:
 - Debug
 - Release
-platform:
-- Win32
-- x64
 
 environment:
+  PATH: C:\Python34;C:\Python34\Scripts;%PATH%
   coveralls_token:
     secure: orvUIm+Uf35nZKLvGr/dDNampXA8v64mzFd2oXvKz5NlsbG4xaYPfhazp+57sk3y
+    
+  matrix:
+    - GENERATOR: Visual Studio 14 2015
+    - GENERATOR: Visual Studio 14 2015 Win64
 
 cache:
 - C:\Users\AppVeyor\.conan -> cache.txt
 - C:\Users\AppVeyor\Downloads -> cache.txt
+- C:\Users\AppVeyor\AppData\Local\pip\Cache -> cache.txt
 
-# Environment Variables are buggy for cache tracking...
-#- '%USERPROFILE%\.conan' -> cache.txt
-#- '%USERPROFILE%\Downloads' -> cache.txt
 install:
-- ps: '.\tools\appveyor\install_conan.ps1'
 - ps: '.\tools\appveyor\install_opencppcoverage.ps1'
+- pip install conan
+
 before_build:
-- ps: '.\tools\appveyor\install_packages.ps1'
-- ps: '.\tools\appveyor\create_solution.ps1'
+- ps: Write-Host -ForegroundColor White (& cmake -Bbuild -H"." -G "$env:GENERATOR")
+
 build:
   project: .\build\eventual.sln
   verbosity: minimal
+  
 test_script:
 - ps: '.\tools\appveyor\run_tests.ps1'
 - ps: '.\tools\appveyor\post_coverage_results.ps1'

@@ -80,7 +80,6 @@ fi
 
 mkdir -p $BuildPath
 pushd $BuildPath
-conan install $SourcePath -s build_type=$ci_build_configuration --build=missing
 
 echo "Starting project Build..."
 cmake -DCMAKE_BUILD_TYPE="${ci_build_configuration}" $SourcePath
@@ -89,7 +88,7 @@ make -j"$(nproc)"
 
 #todo: make check?
 echo "Running Tests..."
-./test/bin/Test
+./library/test/bin/Test
 
 if [ $ci_analyse_coverage -eq 1 ]; then 
 	

@@ -4,7 +4,6 @@ set -e
 
 ToolsPath="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 SourcePath="$( cd "$ToolsPath/../.." && pwd )"
-RootPath="$( cd "$ToolsPath/../../.." && pwd )"
 
 if [[ "${CC}" = "clang" ]]; then 
     coverageTool="$SourcePath/tools/travis/llvm-gcov.sh"
@@ -77,9 +76,9 @@ pushd $SourcePath
 $coverageTool --version
 #ls -la /tmp/build/test/bin
 
-coveralls -r $RootPath \
-          -i src/include/eventual \
-          -i src/include/eventual/detail \
+coveralls -r $SourcePath \
+          -i include/eventual \
+          -i include/eventual/detail \
           --dump $BuildPath/coverage.json \
           --gcov-options '\-lp' \
           --gcov $coverageTool
@@ -101,11 +100,11 @@ captureMidnight=$(date -u -d "$captureDate 0" +%s)
 
 captureYear=$(date -u -d@$captureTimestamp +%Y)
 captureMonth=$(date -u -d@$captureTimestamp +%m)
-captureDay=$(date -u -d@$captureTimestamp +%d)
-captureDoubleMinutes=$((($captureTimestamp - $captureMidnight) / 120))
+captureDay=$(( 10#$(date -u -d@$captureTimestamp +%d) ))
+captureDoubleMinutes=$(( ($captureTimestamp - $captureMidnight) / 120 ))
 
 # "10#" forces bash to treat the result as a decimal value (rather then oct...)
-months=$(((($captureYear - $epochYear) * 12) + (10#$captureMonth - $epochMonth)))
+months=$(((($captureYear - $epochYear) * 12) + ($(( 10#$captureMonth )) - $(( 10#$epochMonth )))))
 
 service_number=$(printf "%d%02d%03d" $months $captureDay $captureDoubleMinutes)
 runTime=$(date -u -d@$captureTimestamp -Iseconds)

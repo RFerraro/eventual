@@ -58,7 +58,7 @@ TYPED_TEST(PromiseTest, IsMoveConstructable)
 
    // Assert
    EXPECT_NO_THROW(other.get_future()) << "Promise move CTor did not transfer a valid state.";
-   EXPECT_THROW(target.get_future(), future_error) << "Original promise still has valid state.";
+   EXPECT_THROW(target.get_future(), std::future_error) << "Original promise still has valid state.";
 }
 
 TYPED_TEST(PromiseTest, IsNotCopyConstructable)
@@ -92,7 +92,7 @@ TYPED_TEST(PromiseTest, DestructorSignalsBrokenPromiseIfNotComplete)
    } // Act
 
    // Assert
-   EXPECT_THROW(future.get(), future_error) << "Promise did not signal a broken promise status.";
+   EXPECT_THROW(future.get(), std::future_error) << "Promise did not signal a broken promise status.";
 }
 
 TYPED_TEST(PromiseTest, IsMoveAssignable)
@@ -105,7 +105,7 @@ TYPED_TEST(PromiseTest, IsMoveAssignable)
 
    // Assert
    EXPECT_NO_THROW(other.get_future()) << "Promise move CTor did not transfer a valid state.";
-   EXPECT_THROW(promise.get_future(), future_error) << "Original promise still has valid state.";
+   EXPECT_THROW(promise.get_future(), std::future_error) << "Original promise still has valid state.";
 }
 
 TYPED_TEST(PromiseTest, IsNotCopyAssignable)
@@ -125,7 +125,7 @@ TYPED_TEST(PromiseTest, IsSwapable)
 
    // Assert
    EXPECT_NO_THROW(target.get_future()) << "Swap did not transfer a valid state.";
-   EXPECT_THROW(moved.get_future(), future_error) << "Swap source still has valid state.";
+   EXPECT_THROW(moved.get_future(), std::future_error) << "Swap source still has valid state.";
 }
 
 TYPED_TEST(PromiseTest, STD_IsSwapable)
@@ -139,7 +139,7 @@ TYPED_TEST(PromiseTest, STD_IsSwapable)
 
    // Assert
    EXPECT_NO_THROW(target.get_future()) << "Swap did not transfer a valid state.";
-   EXPECT_THROW(moved.get_future(), future_error) << "Swap source still has valid state.";
+   EXPECT_THROW(moved.get_future(), std::future_error) << "Swap source still has valid state.";
 }
 
 TYPED_TEST(PromiseTest, GetFuture_ReturnsValidFuture)
@@ -161,7 +161,7 @@ TYPED_TEST(PromiseTest, GetFuture_ThrowsIfInvalid)
    promise<TypeParam> moved(std::move(target));
 
    // Act/Assert
-   EXPECT_THROW(target.get_future(), future_error) << "Promise returned a future, despite having an invalid state.";
+   EXPECT_THROW(target.get_future(), std::future_error) << "Promise returned a future, despite having an invalid state.";
 }
 
 TYPED_TEST(PromiseTest, GetFuture_ThrowsIfCalledMoreThanOnce)
@@ -171,7 +171,7 @@ TYPED_TEST(PromiseTest, GetFuture_ThrowsIfCalledMoreThanOnce)
    promise.get_future();
 
    // Act/Assert
-   EXPECT_THROW(promise.get_future(), future_error) << "Promise returned a future multiple times.";
+   EXPECT_THROW(promise.get_future(), std::future_error) << "Promise returned a future multiple times.";
 }
 
 TYPED_TEST(PromiseTest, SetException_SetsAnExceptionPtrInState)
@@ -193,7 +193,7 @@ TYPED_TEST(PromiseTest, SetException_ThrowsIfStateIsInvalid)
    promise<TypeParam> moved(std::move(target));
 
    // Act/Assert
-   EXPECT_THROW(target.set_exception(std::make_exception_ptr(PromiseTestException())), future_error) << "Promise set an exception on invalid state.";
+   EXPECT_THROW(target.set_exception(std::make_exception_ptr(PromiseTestException())), std::future_error) << "Promise set an exception on invalid state.";
 }
 
 TYPED_TEST(PromiseTest, SetException_ThrowsIfPromiseSatisfied)
@@ -204,7 +204,7 @@ TYPED_TEST(PromiseTest, SetException_ThrowsIfPromiseSatisfied)
    promise.set_exception(exPtr);
 
    // Act/Assert
-   EXPECT_THROW(promise.set_exception(exPtr), future_error) << "Promise set an exception when already satisfied.";
+   EXPECT_THROW(promise.set_exception(exPtr), std::future_error) << "Promise set an exception when already satisfied.";
 }
 
 TYPED_TEST(PromiseTest, SetExceptionAtThreadExit_SetsAnExceptionPtrInState)
@@ -250,7 +250,7 @@ TYPED_TEST(PromiseTest, SetExceptionAtThreadExit_ThrowsIfStateIsInvalid)
       {
           target.set_exception_at_thread_exit(std::make_exception_ptr(PromiseTestException()));
       }
-      catch (const future_error&)
+      catch (const std::future_error&)
       {
          result.store(true);
       }
@@ -281,7 +281,7 @@ TYPED_TEST(PromiseTest, SetExceptionAtThreadExit_ThrowsIfPromiseSatisfied)
       {
          promise.set_exception_at_thread_exit(exPtr);
       }
-      catch (const future_error&)
+      catch (const std::future_error&)
       {
          result.store(true);
       }
@@ -317,7 +317,7 @@ TEST(PromiseTest_Value, SetValue_ThrowsIfCopiedValueIntoStateMultipleTimes)
    promise.set_value(3);
 
    // Act/Assert
-   EXPECT_THROW(promise.set_value(4), future_error) << "SetValue allowed changing the value after being set.";
+   EXPECT_THROW(promise.set_value(4), std::future_error) << "SetValue allowed changing the value after being set.";
 }
 
 TEST(PromiseTest_Value, SetValue_CopiesValueThrowsIfStateIsInvalid)
@@ -327,7 +327,7 @@ TEST(PromiseTest_Value, SetValue_CopiesValueThrowsIfStateIsInvalid)
    promise<int> moved(std::move(target));
 
    // Act/Assert
-   EXPECT_THROW(target.set_value(1), future_error) << "Set_Value did not throw an error when setting a value to an invalid promise.";
+   EXPECT_THROW(target.set_value(1), std::future_error) << "Set_Value did not throw an error when setting a value to an invalid promise.";
 }
 
 TEST(PromiseTest_Value, SetValue_MovesValueIntoState)
@@ -354,7 +354,7 @@ TEST(PromiseTest_Value, SetValue_ThrowsIfMovedValueIntoStateMultipleTimes)
    promise.set_value(NonCopyable());
 
    // Act/Assert
-   EXPECT_THROW(promise.set_value(NonCopyable()), future_error) << "SetValue allowed changing the value after being set.";
+   EXPECT_THROW(promise.set_value(NonCopyable()), std::future_error) << "SetValue allowed changing the value after being set.";
 }
 
 TEST(PromiseTest_ConstValue, SetValue_ThrowsIfSetMultipleTimes)
@@ -366,7 +366,7 @@ TEST(PromiseTest_ConstValue, SetValue_ThrowsIfSetMultipleTimes)
     promise.set_value(value);
 
     // Act/Assert
-    EXPECT_THROW(promise.set_value(value), future_error) << "SetValue allowed changing the value after being set.";
+    EXPECT_THROW(promise.set_value(value), std::future_error) << "SetValue allowed changing the value after being set.";
 }
 
 TEST(PromiseTest_Value, SetValue_MoveValueThrowsIfStateIsInvalid)
@@ -376,7 +376,7 @@ TEST(PromiseTest_Value, SetValue_MoveValueThrowsIfStateIsInvalid)
    promise<NonCopyable> moved(std::move(target));
 
    // Act/Assert
-   EXPECT_THROW(target.set_value(NonCopyable()), future_error) << "Set_Value did not throw an error when setting a value to an invalid promise.";
+   EXPECT_THROW(target.set_value(NonCopyable()), std::future_error) << "Set_Value did not throw an error when setting a value to an invalid promise.";
 }
 
 TEST(PromiseTest_Reference, SetValue_SetsReferenceInState)
@@ -404,7 +404,7 @@ TEST(PromiseTest_Reference, SetValue_ThrowsIfReferenceSetMultipleTimes)
    promise.set_value(first);
 
    // Act/Assert
-   EXPECT_THROW(promise.set_value(second), future_error) << "SetValue allowed changing the reference after being set.";
+   EXPECT_THROW(promise.set_value(second), std::future_error) << "SetValue allowed changing the reference after being set.";
 }
 
 TEST(PromiseTest_Reference, SetValue_ThrowsIfStateIsInvalid)
@@ -415,7 +415,7 @@ TEST(PromiseTest_Reference, SetValue_ThrowsIfStateIsInvalid)
    promise<int&> moved(std::move(target));
 
    // Act/Assert
-   EXPECT_THROW(target.set_value(value), future_error) << "Set_Value did not throw an error when setting a value to an invalid promise.";
+   EXPECT_THROW(target.set_value(value), std::future_error) << "Set_Value did not throw an error when setting a value to an invalid promise.";
 }
 
 TEST(PromiseTest_Void, SetValue_SignalsCompletion)
@@ -437,7 +437,7 @@ TEST(PromiseTest_Void, SetValue_ThrowsIfSetMultipleTimes)
    promise.set_value();
 
    // Act/Assert
-   EXPECT_THROW(promise.set_value(), future_error) << "SetValue was called multiple times after being set.";
+   EXPECT_THROW(promise.set_value(), std::future_error) << "SetValue was called multiple times after being set.";
 }
 
 TEST(PromiseTest_Void, SetValue_ThrowsIfStateIsInvalid)
@@ -447,7 +447,7 @@ TEST(PromiseTest_Void, SetValue_ThrowsIfStateIsInvalid)
    promise<void> moved(std::move(target));
 
    // Act/Assert
-   EXPECT_THROW(target.set_value(), future_error) << "Set_Value did not throw an error when setting a value to an invalid promise.";
+   EXPECT_THROW(target.set_value(), std::future_error) << "Set_Value did not throw an error when setting a value to an invalid promise.";
 }
 
 TEST(PromiseTest_Value, SetValueAtThreadExit_CopiesValueIntoState)
@@ -503,7 +503,7 @@ TEST(PromiseTest_Value, SetValueAtThreadExit_ThrowsIfCopiedValueIntoStateMultipl
       {
          promise.set_value_at_thread_exit(4);
       }
-      catch (const future_error&)
+      catch (const std::future_error&)
       {
          result.store(true);
       }
@@ -534,7 +534,7 @@ TEST(PromiseTest_Value, SetValueAtThreadExit_ThrowsIfCopiedValueIntoStateMultipl
       {
          promise.set_value_at_thread_exit(lValue);
       }
-      catch (const future_error&)
+      catch (const std::future_error&)
       {
          result.store(true);
       }
@@ -559,7 +559,7 @@ TEST(PromiseTest_Value, SetValueAtThreadExit_CopiesValueThrowsIfStateIsInvalid)
       {
           target.set_value_at_thread_exit(1);
       }
-      catch (const future_error&)
+      catch (const std::future_error&)
       {
          result.store(true);
       }
@@ -624,7 +624,7 @@ TEST(PromiseTest_Value, SetValueAtThreadExit_ThrowsIfMovedValueIntoStateMultiple
       {
          promise.set_value_at_thread_exit(NonCopyable());
       }
-      catch (const future_error&)
+      catch (const std::future_error&)
       {
          result.store(true);
       }
@@ -649,7 +649,7 @@ TEST(PromiseTest_Value, SetValueAtThreadExit_MoveValueThrowsIfStateIsInvalid)
       {
           target.set_value_at_thread_exit(NonCopyable());
       }
-      catch (const future_error&)
+      catch (const std::future_error&)
       {
          result.store(true);
       }
@@ -715,7 +715,7 @@ TEST(PromiseTest_Reference, SetValueAtThreadExit_ThrowsIfReferenceSetMultipleTim
       {
          promise.set_value_at_thread_exit(second);
       }
-      catch (const future_error&)
+      catch (const std::future_error&)
       {
          result.store(true);
       }
@@ -741,7 +741,7 @@ TEST(PromiseTest_Reference, SetValueAtThreadExit_ThrowsIfStateIsInvalid)
       {
           target.set_value_at_thread_exit(value);
       }
-      catch (const future_error&)
+      catch (const std::future_error&)
       {
          result.store(true);
       }
@@ -801,7 +801,7 @@ TEST(PromiseTest_Void, SetValueAtThreadExit_ThrowsIfSetMultipleTimes)
       {
          promise.set_value_at_thread_exit();
       }
-      catch (const future_error&)
+      catch (const std::future_error&)
       {
          result.store(true);
       }
@@ -826,7 +826,7 @@ TEST(PromiseTest_Void, SetValueAtThreadExit_ThrowsIfStateIsInvalid)
       {
           target.set_value_at_thread_exit();
       }
-      catch (const future_error&)
+      catch (const std::future_error&)
       {
          result.store(true);
       }
