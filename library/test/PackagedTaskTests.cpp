@@ -96,7 +96,7 @@ TEST(PackagedTaskTest, DestructorSignalsBrokenPromiseIfNotComplete)
    } // Act
 
      // Assert
-   EXPECT_THROW(future.get(), future_error);
+   EXPECT_THROW(future.get(), std::future_error);
 }
 
 TEST(PackagedTaskTest, IsMoveAssignable)
@@ -196,7 +196,7 @@ TEST(PackagedTaskTest, GetFuture_ThrowsIfTaskIsInvalid)
    packaged_task<int(int)> task;
 
    // Act/Assert
-   EXPECT_THROW(task.get_future(), future_error);
+   EXPECT_THROW(task.get_future(), std::future_error);
 }
 
 TEST(PackagedTaskTest, GetFuture_ThrowsIfCalledMoreThanOnce)
@@ -206,7 +206,7 @@ TEST(PackagedTaskTest, GetFuture_ThrowsIfCalledMoreThanOnce)
    task.get_future();
 
    // Act/Assert
-   EXPECT_THROW(task.get_future(), future_error);
+   EXPECT_THROW(task.get_future(), std::future_error);
 }
 
 TEST(PackagedTaskTest, Execute_FullfillsTaskPromise)
@@ -255,27 +255,27 @@ TEST(PackagedTaskTest, Execute_ForwardsTaskExceptions)
 TEST(PackagedTaskTest, Execute_ForwardsTaskExceptions_FutureError)
 {
    // Arrange
-   packaged_task<int(int)> task([](int) -> int { throw future_error(std::make_error_code(future_errc::no_state)); });
+   packaged_task<int(int)> task([](int) -> int { throw std::future_error(std::make_error_code(std::future_errc::no_state)); });
    auto future = task.get_future();
 
    // Act
    task(0);
 
    // Assert
-   EXPECT_THROW(future.get(), future_error);
+   EXPECT_THROW(future.get(), std::future_error);
 }
 
 TEST(PackagedTaskTest, ExecuteWithVoid_ForwardsTaskExceptions_FutureError)
 {
     // Arrange
-    packaged_task<void(int)> task([](int) { throw future_error(std::make_error_code(future_errc::no_state)); });
+    packaged_task<void(int)> task([](int) { throw std::future_error(std::make_error_code(std::future_errc::no_state)); });
     auto future = task.get_future();
 
     // Act
     task(0);
 
     // Assert
-    EXPECT_THROW(future.get(), future_error);
+    EXPECT_THROW(future.get(), std::future_error);
 }
 
 TEST(PackagedTaskTest, Execute_ThrowsIfTaskIsInvalid)
@@ -284,7 +284,7 @@ TEST(PackagedTaskTest, Execute_ThrowsIfTaskIsInvalid)
    packaged_task<int(int)> task;
 
    // Act/Assert
-   EXPECT_THROW(task(0), future_error);
+   EXPECT_THROW(task(0), std::future_error);
 }
 
 TEST(PackagedTaskTest, Execute_ThrowsIfTaskPromiseSatisfied)
@@ -294,7 +294,7 @@ TEST(PackagedTaskTest, Execute_ThrowsIfTaskPromiseSatisfied)
    task(0);
 
    // Act/Assert
-   EXPECT_THROW(task(0), future_error);
+   EXPECT_THROW(task(0), std::future_error);
 }
 
 TEST(PackagedTaskTest, ExecuteWithVoid_ThrowsIfTaskPromiseSatisfied)
@@ -304,7 +304,7 @@ TEST(PackagedTaskTest, ExecuteWithVoid_ThrowsIfTaskPromiseSatisfied)
     task(0);
 
     // Act/Assert
-    EXPECT_THROW(task(0), future_error);
+    EXPECT_THROW(task(0), std::future_error);
 }
 
 TEST(PackagedTaskTest, MakeReadyAtThreadExit_FullfillsTaskPromise)
@@ -432,7 +432,7 @@ TEST(PackagedTaskTest, MakeReadyAtThreadExitVoid_ForwardsTaskExceptions)
 TEST(PackagedTaskTest, MakeReadyAtThreadExit_ForwardsTaskExceptions_FutureError)
 {
    // Arrange
-   packaged_task<int(int)> task([](int) -> int { throw future_error(std::make_error_code(future_errc::no_state)); });
+   packaged_task<int(int)> task([](int) -> int { throw std::future_error(std::make_error_code(std::future_errc::no_state)); });
    auto future = task.get_future();
 
    std::mutex m;
@@ -456,13 +456,13 @@ TEST(PackagedTaskTest, MakeReadyAtThreadExit_ForwardsTaskExceptions_FutureError)
    }
    cv.notify_all();
    worker.join();
-   EXPECT_THROW(future.get(), future_error);
+   EXPECT_THROW(future.get(), std::future_error);
 }
 
 TEST(PackagedTaskTest, MakeReadyAtThreadExitVoid_ForwardsTaskExceptions_FutureError)
 {
     // Arrange
-    packaged_task<void(int)> task([](int) { throw future_error(std::make_error_code(future_errc::no_state)); });
+    packaged_task<void(int)> task([](int) { throw std::future_error(std::make_error_code(std::future_errc::no_state)); });
     auto future = task.get_future();
 
     std::mutex m;
@@ -486,7 +486,7 @@ TEST(PackagedTaskTest, MakeReadyAtThreadExitVoid_ForwardsTaskExceptions_FutureEr
     }
     cv.notify_all();
     worker.join();
-    EXPECT_THROW(future.get(), future_error);
+    EXPECT_THROW(future.get(), std::future_error);
 }
 
 TEST(PackagedTaskTest, MakeReadyAtThreadExit_ThrowsIfTaskIsInvalid)
@@ -495,7 +495,7 @@ TEST(PackagedTaskTest, MakeReadyAtThreadExit_ThrowsIfTaskIsInvalid)
    packaged_task<int(int)> task;
 
    // Act/Assert
-   EXPECT_THROW(task.make_ready_at_thread_exit(0), future_error);
+   EXPECT_THROW(task.make_ready_at_thread_exit(0), std::future_error);
 }
 
 TEST(PackagedTaskTest, MakeReadyAtThreadExit_ThrowsIfTaskPromiseSatisfied)
@@ -505,7 +505,7 @@ TEST(PackagedTaskTest, MakeReadyAtThreadExit_ThrowsIfTaskPromiseSatisfied)
    task.make_ready_at_thread_exit(0);
 
    // Act/Assert
-   EXPECT_THROW(task.make_ready_at_thread_exit(0), future_error);
+   EXPECT_THROW(task.make_ready_at_thread_exit(0), std::future_error);
 }
 
 TEST(PackagedTaskTest, MakeReadyAtThreadExitVoid_ThrowsIfTaskPromiseSatisfied)
@@ -515,7 +515,7 @@ TEST(PackagedTaskTest, MakeReadyAtThreadExitVoid_ThrowsIfTaskPromiseSatisfied)
     task.make_ready_at_thread_exit(0);
 
     // Act/Assert
-    EXPECT_THROW(task.make_ready_at_thread_exit(0), future_error);
+    EXPECT_THROW(task.make_ready_at_thread_exit(0), std::future_error);
 }
 
 TEST(PackagedTaskTest, Reset_ResetsPromiseState)
@@ -538,5 +538,5 @@ TEST(PackagedTaskTest, Reset_ThrowsIfTaskIsInvalid)
    packaged_task<int(int)> task;
    
    // Act/Assert
-   EXPECT_THROW(task.reset(), future_error);
+   EXPECT_THROW(task.reset(), std::future_error);
 }

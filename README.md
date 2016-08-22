@@ -8,4 +8,4 @@ A futures library with continuations, inspired by the upcoming C++ Extensions fo
 
 | Code Coverage |
 | --- |
-| [![Coverage Status](https://coveralls.io/repos/github/RFerraro/eventual/badge.svg?branch=master)](https://coveralls.io/github/RFerraro/eventual?branch=master) |
+| [![Coverage Status](https://codecov.io/gh/RFerraro/eventual/branch/master/graph/badge.svg)](https://codecov.io/gh/RFerraro/eventual) |

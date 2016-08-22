@@ -3,8 +3,8 @@ $testCaseLine = "^([\w/]+).+$"
 $testNameLine = "^\s+(\w+)$"
 $lastTestCase = "unknown"
 $testExe = "test.exe"
-$testPath = [System.IO.Path]::Combine($Env:APPVEYOR_BUILD_FOLDER, "bin", $Env:Configuration, $testExe)
-$includePath = [System.IO.Path]::Combine($Env:APPVEYOR_BUILD_FOLDER, "include", "eventual")
+$testPath = [System.IO.Path]::Combine($Env:APPVEYOR_BUILD_FOLDER, "build", "library", "test", $Env:Configuration, $testExe)
+$includePath = [System.IO.Path]::Combine($Env:APPVEYOR_BUILD_FOLDER, "library", "eventual", "include")
 $testCoveragePath = [System.IO.Path]::Combine($Env:APPVEYOR_BUILD_FOLDER, "coverage_results")
 $testConfiguration = ($env:CONFIGURATION + "-" + $env:PLATFORM)
 $coberturaFile = [System.IO.Path]::Combine($Env:APPVEYOR_BUILD_FOLDER, "coverage_results.xml")
@@ -123,7 +123,7 @@ function Run-Tests
                 Start-Sleep -s 1
             }
 
-            Write-Host -ForegroundColor White "Coverage analysis complete, pushing coverage file."
+            Write-Host -ForegroundColor White "Coverage analysis complete, writing coverage file."
 
             $coverageName = ("test_coverage(" + $testConfiguration + ")")
             $coverageArchive = ($coverageName + ".zip")
