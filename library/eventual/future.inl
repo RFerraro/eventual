@@ -4,9 +4,9 @@
 
 #include <utility>
 
-#include "detail/utility.inl"
-#include "detail/BasicFuture.inl"
-#include "shared_future.inl"
+#include "detail/utility.h"
+#include "detail/BasicFuture.h"
+#include "shared_future.h"
 
 #include "future.cpp"
 

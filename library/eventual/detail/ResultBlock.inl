@@ -4,7 +4,7 @@
 #include <utility>
 #include <cassert>
 
-#include "utility.inl"
+#include "utility.h"
 
 namespace eventual
 {

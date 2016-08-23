@@ -1,6 +1,5 @@
 #pragma once
 
-#include <utility>
 #include <chrono>
 
 #include "traits.h"

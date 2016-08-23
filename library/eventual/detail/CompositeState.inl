@@ -4,8 +4,8 @@
 
 #include <memory>
 
-#include "FutureHelper.inl"
-#include "State.inl"
+#include "FutureHelper.h"
+#include "State.h"
 
 namespace eventual
 {

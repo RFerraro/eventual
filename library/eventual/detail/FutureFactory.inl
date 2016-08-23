@@ -2,7 +2,7 @@
 
 #include "FutureFactory.h"
 
-#include "future.inl"
+#include "future.h"
 
 namespace eventual
 {

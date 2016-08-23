@@ -3,10 +3,9 @@
 #include "eventual_methods.h"
 #include <exception>
 
-#include "future.inl"
-#include "detail/detail.inl"
-#include "detail/FutureHelper.inl"
-
+#include "future.h"
+#include "detail/detail.h"
+#include "detail/FutureHelper.h"
 #include "detail/traits.h"
 
 #include "eventual_methods.cpp"

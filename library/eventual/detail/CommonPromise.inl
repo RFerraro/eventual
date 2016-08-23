@@ -6,9 +6,8 @@
 
 #include "future.h"
 #include "FutureFactory.h"
-
-#include "State.inl"
-#include "CompositeState.inl"
+#include "State.h"
+#include "CompositeState.h"
 
 namespace eventual
 {

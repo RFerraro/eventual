@@ -5,8 +5,8 @@
 #include <type_traits>
 #include <utility>
 
-#include "polymorphic_allocator.inl"
-#include "resource_adapter.inl"
+#include "polymorphic_allocator.h"
+#include "resource_adapter.h"
 
 namespace eventual
 {

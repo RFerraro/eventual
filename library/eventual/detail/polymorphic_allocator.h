@@ -2,12 +2,12 @@
 
 #include <cstddef>
 
-#include "memory_resource.h"
-
 namespace eventual
 {
     namespace detail
     {
+        class memory_resource;
+        
         template<class T>
         class polymorphic_allocator
         {

@@ -2,8 +2,8 @@
 
 #include "FutureHelper.h"
 
-#include "BasicFuture.inl"
-#include "BasicPromise.inl"
+#include "BasicFuture.h"
+#include "BasicPromise.h"
 
 namespace eventual
 {

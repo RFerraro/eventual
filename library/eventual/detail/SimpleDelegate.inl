@@ -5,8 +5,8 @@
 #include <memory>
 #include <utility>
 
-#include "polymorphic_allocator.inl"
-#include "utility.inl"
+#include "polymorphic_allocator.h"
+#include "utility.h"
 
 #include "SimpleDelegate.cpp"
 

@@ -2,8 +2,8 @@
 
 #include <type_traits>
 #include <memory>
-#include "polymorphic_allocator.h"
 
+#include "polymorphic_allocator.h"
 #include "utility.h"
 
 namespace eventual

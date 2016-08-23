@@ -4,7 +4,7 @@
 
 #include <utility>
 
-#include "detail/BasicPromise.inl"
+#include "detail/BasicPromise.h"
 
 #include "promise.cpp"
 

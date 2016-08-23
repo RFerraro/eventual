@@ -3,9 +3,9 @@
 #include "packaged_task.h"
 
 #include <utility>
-#include "detail/traits.h"
 
-#include "detail/BasicTask.inl"
+#include "detail/traits.h"
+#include "detail/BasicTask.h"
 
 namespace std
 {

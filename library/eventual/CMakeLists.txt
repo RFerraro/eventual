@@ -86,6 +86,11 @@ source_group("Inline Files\\detail" FILES ${eventual_inline_detail})
 source_group("Source Files" FILES ${eventual_source})
 source_group("Source Files\\detail" FILES ${eventual_source_detail})
 
+#set_source_files_properties(${eventual_inline} PROPERTIES HEADER_FILE_ONLY TRUE)
+#set_source_files_properties(${eventual_source} PROPERTIES HEADER_FILE_ONLY TRUE)
+#set_source_files_properties(${eventual_inline_detail} PROPERTIES HEADER_FILE_ONLY TRUE)
+#set_source_files_properties(${eventual_source_detail} PROPERTIES HEADER_FILE_ONLY TRUE)
+
 #header only
 add_library(eventual_lib INTERFACE)
 target_compile_definitions(

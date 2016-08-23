@@ -7,9 +7,9 @@
 #include <queue>
 
 #include "traits.h"
-#include "strong_polymorphic_allocator.inl"
-#include "SimpleDelegate.inl"
-#include "ResultBlock.inl"
+#include "strong_polymorphic_allocator.h"
+#include "SimpleDelegate.h"
+#include "ResultBlock.h"
 
 namespace eventual
 {

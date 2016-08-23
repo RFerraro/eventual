@@ -7,11 +7,11 @@
 #include "future.h"
 #include "shared_future.h"
 
-#include "State.inl"
-#include "CompositeState.inl"
-#include "CommonPromise.inl"
-#include "BasicTask.inl"
-#include "FutureFactory.inl"
+#include "State.h"
+#include "CompositeState.h"
+#include "CommonPromise.h"
+#include "BasicTask.h"
+#include "FutureFactory.h"
 
 namespace eventual
 {   

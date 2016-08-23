@@ -5,7 +5,7 @@
 #include <cassert>
 #include <utility>
 
-#include "memory_resource.inl"
+#include "memory_resource.h"
 
 namespace eventual
 {

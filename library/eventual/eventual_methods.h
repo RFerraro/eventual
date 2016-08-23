@@ -1,14 +1,15 @@
 #pragma once
 
 #include <cstddef>
+#include <tuple>
+#include <exception>
 
 #include "detail/detail.h"
-#include "detail/utility.h"
 
 namespace eventual
 {
     template<class TResult> class future;
-    
+
     template<class Sequence>
     struct when_any_result
     {

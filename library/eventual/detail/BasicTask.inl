@@ -4,7 +4,7 @@
 #include <utility>
 #include <future>
 
-#include "utility.inl"
+#include "utility.h"
 
 namespace eventual
 {
