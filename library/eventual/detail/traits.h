@@ -22,10 +22,11 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <algorithm>
 #include <type_traits>
+#include <algorithm>
 #include <functional>
 #include <utility>
+#include <memory>
 
 namespace
 {
@@ -197,12 +198,34 @@ namespace eventual
         template<class T>
         using get_shared_state_t = typename get_state<T>::shared_type;
 
+        template<class T>
+        struct get_state_result
+        {
+
+        };
+
+        template<class T>
+        struct get_state_result<State<T>>
+        {
+            typedef typename T result_type;
+        };
+
+        template<class T, class U>
+        struct get_state_result<CompositeState<State<T>, U>>
+        {
+            typedef typename T result_type;
+        };
+
+        template<class T>
+        using get_state_result_t = typename get_state_result<T>::result_type;
+
         template<class T, class U, class TResult>
         using enable_if_size_is_greater_than_t = typename std::enable_if<(sizeof(T) > sizeof(U)), TResult>::type;
 
         template<class T, class U, class TResult>
         using enable_if_size_is_less_than_or_eq_t = typename std::enable_if<(sizeof(T) <= sizeof(U)), TResult>::type;
 
+        // todo: verify if this is needed
         // from: http://talesofcpp.fusionfenix.com/post-11/true-story-call-me-maybe
         #if (__cplusplus >= _Cpp14)
 
