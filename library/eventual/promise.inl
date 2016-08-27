@@ -6,7 +6,9 @@
 
 #include "detail/BasicPromise.h"
 
+#if defined(EVENTUAL_HEADER_ONLY)
 #include "promise.cpp"
+#endif
 
 namespace std
 {

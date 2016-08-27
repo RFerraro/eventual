@@ -1,7 +1,10 @@
 #pragma once
 
 #include "detail.h"
+
+#if defined(EVENTUAL_HEADER_ONLY)
 #include "detail.cpp"
+#endif
 
 namespace eventual
 {

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "eventual_export.h"
 #include "detail/BasicFuture.h"
 
 namespace eventual
@@ -59,10 +60,10 @@ namespace eventual
 
         shared_future() noexcept = default;
         shared_future(const shared_future& other) = default;
-        inline shared_future(future<void>&& other) noexcept;
+        EVENTUAL_API shared_future(future<void>&& other) noexcept;
         shared_future(shared_future&& other) noexcept = default;
 
-        inline shared_future(future<shared_future>&& other) noexcept;
+        EVENTUAL_API shared_future(future<shared_future>&& other) noexcept;
 
         shared_future& operator=(const shared_future& other) = default;
         shared_future& operator=(shared_future&& other) noexcept = default;
@@ -70,6 +71,6 @@ namespace eventual
         template<class F>
         decltype(auto) then(F&& continuation);
 
-        inline void get() const;
+        EVENTUAL_API void get() const;
     };
 }

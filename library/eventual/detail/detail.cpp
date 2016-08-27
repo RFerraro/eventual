@@ -5,10 +5,10 @@
 #include <memory>
 #include <tuple>
 
-#include "future.inl"
-#include "eventual_methods.inl"
-#include "detail/memory_resource.inl"
-#include "detail/resource_adapter.inl"
+#include "../future.h"
+#include "../eventual_methods.h"
+#include "memory_resource.h"
+#include "resource_adapter.h"
 
 namespace eventual
 {

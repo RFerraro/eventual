@@ -1,8 +1,8 @@
 #pragma once
 
-#include "eventual_methods.inl"
-#include "future.inl"
-#include "promise.inl"
+#include "eventual_methods.h"
+#include "future.h"
+#include "promise.h"
 
 namespace eventual
 {

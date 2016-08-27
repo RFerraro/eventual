@@ -1,7 +1,10 @@
 #pragma once
 
-#include "detail/SimpleDelegate.inl"
+#include "SimpleDelegate.inl"
 #include <cassert>
+
+eventual::detail::SimpleDelegate::Delegate::~Delegate() { }
+
 
 void eventual::detail::SimpleDelegate::operator()() const
 {

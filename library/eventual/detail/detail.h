@@ -5,6 +5,8 @@
 #include <type_traits>
 #include <tuple>
 
+#include "../eventual_export.h"
+
 namespace eventual
 {
     template<class TResult> class future;
@@ -26,11 +28,11 @@ namespace eventual
         template<class... Futures>
         using any_futures_result_tuple = future<when_any_result<std::tuple<std::decay_t<Futures>...>>>;
         
-        inline memory_resource* get_default_resource() noexcept;
+        EVENTUAL_API memory_resource* get_default_resource() noexcept;
 
         template<class Future, class... Futures>
         static decltype(auto) When_All_(Future&& head, Futures&&... others);
 
-        static inline future<std::tuple<>> When_All_();
+        static EVENTUAL_API future<std::tuple<>> When_All_();
     }
 }

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "detail/utility.inl"
+#include "utility.h"
 
 #include <future>
 #include <exception>

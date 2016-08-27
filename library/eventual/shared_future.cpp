@@ -4,8 +4,12 @@
 
 #include <utility>
 
-#include "detail/BasicFuture.inl"
-#include "future.inl"
+#include "detail/BasicFuture.h"
+#include "future.h"
+
+#if !defined(EVENTUAL_HEADER_ONLY)
+#include "shared_future.inl"
+#endif
 
 namespace eventual
 {

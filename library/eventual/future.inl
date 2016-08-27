@@ -8,7 +8,9 @@
 #include "detail/BasicFuture.h"
 #include "shared_future.h"
 
+#if defined(EVENTUAL_HEADER_ONLY)
 #include "future.cpp"
+#endif
 
 namespace eventual
 {

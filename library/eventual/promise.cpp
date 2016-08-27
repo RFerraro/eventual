@@ -1,6 +1,6 @@
 #pragma once
 
-#include "promise.inl"
+#include "promise.h"
 #include "detail/traits.h"
 
 namespace eventual

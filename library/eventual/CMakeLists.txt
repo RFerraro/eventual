@@ -3,10 +3,13 @@ cmake_minimum_required(VERSION 3.0)
 include(GenerateExportHeader)
 project(eventual)
 
+option(HEADER_ONLY "Generate a header-only library")
+
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 set(eventual_headers
     ./eventual.h
+    ./eventual_export.h
     ./eventual_methods.h
     ./future.h
     ./packaged_task.h
@@ -68,17 +71,10 @@ set(eventual_source
     ./detail/memory_resource.cpp
     ./detail/SimpleDelegate.cpp
     ./detail/utility.cpp)
+ 
+set_source_files_properties(${eventual_inline} PROPERTIES HEADER_FILE_ONLY TRUE)
+set_source_files_properties(${eventual_inline_detail} PROPERTIES HEADER_FILE_ONLY TRUE)
 
-#dummy target
-add_custom_target(eventual 
-                  SOURCES 
-                     ${eventual_headers} 
-                     ${eventual_inline} 
-                     ${eventual_source} 
-                     ${eventual_headers_detail} 
-                     ${eventual_inline_detail} 
-                     ${eventual_source_detail})
-                     
 source_group("Header Files" FILES ${eventual_headers})
 source_group("Header Files\\detail" FILES ${eventual_headers_detail})
 source_group("Inline Files" FILES ${eventual_inline})
@@ -86,22 +82,50 @@ source_group("Inline Files\\detail" FILES ${eventual_inline_detail})
 source_group("Source Files" FILES ${eventual_source})
 source_group("Source Files\\detail" FILES ${eventual_source_detail})
 
-#set_source_files_properties(${eventual_inline} PROPERTIES HEADER_FILE_ONLY TRUE)
-#set_source_files_properties(${eventual_source} PROPERTIES HEADER_FILE_ONLY TRUE)
-#set_source_files_properties(${eventual_inline_detail} PROPERTIES HEADER_FILE_ONLY TRUE)
-#set_source_files_properties(${eventual_source_detail} PROPERTIES HEADER_FILE_ONLY TRUE)
+set(eventual_source_all 
+    ${eventual_headers} 
+    ${eventual_inline} 
+    ${eventual_source} 
+    ${eventual_headers_detail} 
+    ${eventual_inline_detail} 
+    ${eventual_source_detail})
 
-#header only
-add_library(eventual_lib INTERFACE)
-target_compile_definitions(
-    eventual_lib
-    INTERFACE LIBRARY_HEADER_ONLY
-)
+set(eventual_source_public 
+    ${eventual_headers} 
+    ${eventual_inline} 
+    ${eventual_source})
+
+set(eventual_source_detail 
+    ${eventual_headers} 
+    ${eventual_inline} 
+    ${eventual_source})
+
+if(HEADER_ONLY)
+
+    set(target_name eventual_lib)
+
+    #dummy target
+    add_custom_target(eventual ${eventual_headers}
+                      SOURCES ${eventual_source_all})
+    
+    #header only
+    add_library(${target_name} INTERFACE)
+    
+    target_compile_definitions(${target_name}
+                               INTERFACE EVENTUAL_HEADER_ONLY)
+    
+else()
+
+    set(target_name eventual)
+
+    add_library(${target_name} ${eventual_source_all})
+
+endif()
 
 #create an exportfile directed in the build tree (rather then installing)
 EXPORT(
         TARGETS
-            eventual_lib
+            ${target_name}
         FILE
             eventual-tree-export.cmake)
 
@@ -121,7 +145,7 @@ install(
 			
 install(
         TARGETS
-            eventual_lib
+            ${target_name}
         EXPORT eventual
         RUNTIME DESTINATION bin
         ARCHIVE DESTINATION lib

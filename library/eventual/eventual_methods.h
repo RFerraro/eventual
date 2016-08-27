@@ -4,6 +4,7 @@
 #include <tuple>
 #include <exception>
 
+#include "eventual_export.h"
 #include "detail/detail.h"
 
 namespace eventual
@@ -21,7 +22,7 @@ namespace eventual
     future<detail::decay_future_result_t<T>>
         make_ready_future(T&& value);
 
-    inline future<void> make_ready_future();
+    EVENTUAL_API future<void> make_ready_future();
 
     template<class T>
     future<T>
@@ -47,5 +48,5 @@ namespace eventual
     detail::any_futures_result_tuple<Futures...>
         when_any(Futures&&... futures);
 
-    inline future<when_any_result<std::tuple<>>> when_any();
+    EVENTUAL_API future<when_any_result<std::tuple<>>> when_any();
 }

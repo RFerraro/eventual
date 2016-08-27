@@ -28,6 +28,7 @@
 #include <future>
 #include <exception>
 
+#include "../eventual_export.h"
 #include "traits.h"
 
 namespace eventual
@@ -51,9 +52,9 @@ namespace eventual
         std::enable_if_t<I == std::tuple_size<TTuple>::value>
             for_each(TTuple&, Func&&);
 
-        inline std::future_error CreateFutureError(std::future_errc error);
+        EVENTUAL_API std::future_error CreateFutureError(std::future_errc error);
 
-        inline std::exception_ptr CreateFutureExceptionPtr(std::future_errc error);
+        EVENTUAL_API std::exception_ptr CreateFutureExceptionPtr(std::future_errc error);
 
         template<class TFunctor, class TCallable, class Allocator>
         static detail::enable_if_uses_allocator_t<TFunctor, Allocator>

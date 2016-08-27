@@ -8,7 +8,9 @@
 
 #include "traits.h"
 
+#if defined(EVENTUAL_HEADER_ONLY)
 #include "utility.cpp"
+#endif
 
 namespace eventual
 {

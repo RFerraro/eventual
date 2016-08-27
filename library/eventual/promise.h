@@ -2,6 +2,7 @@
 
 #include <memory>
 
+#include "eventual_export.h"
 #include "detail/BasicPromise.h"
 
 namespace eventual
@@ -68,10 +69,10 @@ namespace eventual
         promise& operator=(const promise& rhs) = delete;
         promise& operator=(promise&& other) noexcept = default;
 
-        inline void swap(promise& other) noexcept;
+        EVENTUAL_API void swap(promise& other) noexcept;
 
-        inline void set_value();
-        inline void set_value_at_thread_exit();
+        EVENTUAL_API void set_value();
+        EVENTUAL_API void set_value_at_thread_exit();
     };
 }
 

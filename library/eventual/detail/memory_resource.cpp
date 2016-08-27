@@ -1,6 +1,6 @@
 #pragma once
 
-#include "detail/memory_resource.inl"
+#include "memory_resource.h"
 
 namespace eventual
 {

@@ -8,7 +8,9 @@
 #include "polymorphic_allocator.h"
 #include "utility.h"
 
+#if defined(EVENTUAL_HEADER_ONLY)
 #include "SimpleDelegate.cpp"
+#endif
 
 namespace eventual
 {

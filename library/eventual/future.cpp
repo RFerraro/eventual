@@ -4,8 +4,8 @@
 
 #include <utility>
 
-#include "shared_future.inl"
-#include "detail/utility.inl"
+#include "shared_future.h"
+#include "detail/utility.h"
 
 namespace eventual
 {

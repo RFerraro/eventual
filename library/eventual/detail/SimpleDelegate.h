@@ -3,6 +3,7 @@
 #include <type_traits>
 #include <memory>
 
+#include "../eventual_export.h"
 #include "polymorphic_allocator.h"
 #include "utility.h"
 
@@ -15,7 +16,7 @@ namespace eventual
             class Delegate
             {
             public:
-                virtual ~Delegate() { }
+                virtual EVENTUAL_API ~Delegate();
                 virtual void operator()() = 0;
             };
 
@@ -26,7 +27,7 @@ namespace eventual
 
                 SmallDelegate(T&& callable);
 
-                virtual inline void operator()() override;
+                virtual EVENTUAL_API void operator()() override;
 
             private:
                 T _callable;
@@ -39,7 +40,7 @@ namespace eventual
 
                 LargeDelegate(T&& callable, polymorphic_allocator<T>&& allocator);
 
-                virtual inline void operator()() override;
+                virtual EVENTUAL_API void operator()() override;
 
             private:
 
@@ -60,7 +61,7 @@ namespace eventual
             // dummy type
             struct Callable
             {
-                void inline operator()();
+                EVENTUAL_API void operator()();
             };
 
             //todo: fine-tune this size
@@ -79,7 +80,7 @@ namespace eventual
             SimpleDelegate(const SimpleDelegate&) = delete;
             SimpleDelegate& operator=(SimpleDelegate&&) = default;
 
-            inline void operator()() const;
+            EVENTUAL_API void operator()() const;
 
         private:
 

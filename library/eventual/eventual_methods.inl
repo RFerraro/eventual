@@ -8,7 +8,9 @@
 #include "detail/FutureHelper.h"
 #include "detail/traits.h"
 
+#if defined(EVENTUAL_HEADER_ONLY)
 #include "eventual_methods.cpp"
+#endif
 
 namespace eventual
 {
