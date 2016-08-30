@@ -34,7 +34,7 @@ namespace eventual
 
             bool SetException(std::exception_ptr ex);
 
-            typename get_state_result_t<TPrimaryState> GetResult();
+            get_state_result_t<TPrimaryState> GetResult();
 
             const get_state_result_t<TPrimaryState>& GetResult() const;
 

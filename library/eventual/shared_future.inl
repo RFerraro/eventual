@@ -33,7 +33,7 @@ namespace eventual
     template<class R>
     const R& shared_future<R>::get() const
     {
-        return Base::GetResultRef<R>();
+        return Base::template GetResultRef<R>();
     }
 
     template<class R>
@@ -56,7 +56,7 @@ namespace eventual
     template<class R>
     R& shared_future<R&>::get() const
     {
-        return Base::GetResultRef<R>();
+        return Base::template GetResultRef<R>();
     }
 
     template<class F>

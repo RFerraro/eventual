@@ -6,6 +6,7 @@
 
 #include "eventual_export.h"
 #include "detail/detail.h"
+#include "detail/traits.h"
 
 namespace eventual
 {

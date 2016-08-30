@@ -10,6 +10,9 @@ conanbuildinfo.cmake
 # default project install prefix
 /install/
 
+# VSCode
+.vscode
+
 # VC++ 2015
 *.VC.db
 *.VC.opendb

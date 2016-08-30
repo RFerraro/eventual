@@ -21,7 +21,7 @@ namespace eventual
 
     template<class RType>
     template<class TPromise>
-    future<RType>::future(const TPromise& promise, detail::enable_if_not_same_t<future, TPromise, int> = 0)
+    future<RType>::future(const TPromise& promise, detail::enable_if_not_same_t<future, TPromise, int>)
         : Base(promise)
     { }
 
@@ -35,7 +35,7 @@ namespace eventual
     template<class RType>
     RType future<RType>::get()
     {
-        return Base::GetResult<RType>();
+        return Base::template GetResult<RType>();
     }
 
     template<class RType>
@@ -51,7 +51,7 @@ namespace eventual
 
     template<class RType>
     template<class TPromise>
-    future<RType&>::future(const TPromise& promise, detail::enable_if_not_same_t<future, TPromise, int> = 0)
+    future<RType&>::future(const TPromise& promise, detail::enable_if_not_same_t<future, TPromise, int>)
         : Base(promise)
     { }
 
@@ -65,7 +65,7 @@ namespace eventual
     template<class RType>
     RType& future<RType&>::get()
     {
-        return Base::GetResult<RType&>();
+        return Base::template GetResult<RType&>();
     }
 
     template<class RType>

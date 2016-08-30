@@ -10,8 +10,11 @@ set(sample_sources
 
 add_executable(Sample ${sample_sources})
 
-target_link_libraries(Sample PUBLIC eventual_lib)
-target_include_directories(Sample PUBLIC ../)
+if(NOT HEADER_ONLY)
+    target_link_libraries(Sample PUBLIC eventual)
+endif()
+
+target_include_directories(Sample PUBLIC ${CMAKE_SOURCE_DIR}/library)
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
 

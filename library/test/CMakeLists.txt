@@ -29,6 +29,10 @@ function(install_dependencies)
    set(install_args SOURCE_DIR ARCH BUILD_TYPE COMPILER RUNTIME LIBCXX OUTPUT_FILE)
    cmake_parse_arguments(install_dependencies "" "${install_args}" "" ${ARGN} )
    
+   if(install_dependencies_BUILD_TYPE STREQUAL "")
+      set(install_dependencies_BUILD_TYPE "Debug")
+   endif()
+   
    if((DEFINED install_dependencies_RUNTIME) AND (NOT install_dependencies_RUNTIME STREQUAL ""))
       
       execute_process(
@@ -104,6 +108,8 @@ if(CMAKE_CONFIGURATION_TYPES) #Multi-Configuration
       
 else()
 
+   message("Build Type: ${CMAKE_BUILD_TYPE}")
+
    install_dependencies(
       SOURCE_DIR ${CMAKE_SOURCE_DIR}
       ARCH ${conan_arch}
@@ -138,7 +144,10 @@ set(test_sources
 
 add_executable(Test ${test_sources})
 
-target_link_libraries(Test PUBLIC eventual_lib)
+if(NOT HEADER_ONLY)
+    target_link_libraries(Test PUBLIC eventual)
+endif()
+
 target_include_directories(Test PUBLIC ${CMAKE_SOURCE_DIR}/library)
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")

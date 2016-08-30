@@ -1,4 +1,6 @@
+#if defined(EVENTUAL_HEADER_ONLY)
 #pragma once
+#endif
 
 #include "memory_resource.h"
 
@@ -21,12 +23,12 @@ namespace eventual
             return do_is_equal(other);
         }
 
-        bool eventual::detail::operator==(const memory_resource& a, const memory_resource& b)
+        bool operator==(const memory_resource& a, const memory_resource& b)
         {
             return (&a == &b || a.is_equal(b));
         }
 
-        bool eventual::detail::operator!=(const memory_resource& a, const memory_resource& b)
+        bool operator!=(const memory_resource& a, const memory_resource& b)
         {
             return !(a == b);
         }

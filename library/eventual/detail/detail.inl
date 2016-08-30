@@ -1,28 +1,18 @@
 #pragma once
 
-#include "detail.h"
-
-#if defined(EVENTUAL_HEADER_ONLY)
-#include "detail.cpp"
-#endif
-
-namespace eventual
-{
-    namespace detail
-    {
-        template<class Future, class... Futures>
-        decltype(auto) When_All_(Future&& head, Futures&&... others)
-        {
-            using namespace std;
-
-            auto tailfuture = When_All_(forward<Futures>(others)...);
-            return tailfuture.then([head = move(head)](auto& tf) mutable
-            {
-                return head.then([tf = move(tf)](auto& h) mutable
-                {
-                    return tuple_cat(make_tuple(move(h)), tf.get());
-                });
-            });
-        }
-    }
-}
+#include "detail_methods.inl"
+#include "BasicFuture.inl"
+#include "BasicPromise.inl"
+#include "BasicTask.inl"
+#include "CommonPromise.inl"
+#include "CompositeState.inl"
+#include "FutureFactory.inl"
+#include "FutureHelper.inl"
+#include "memory_resource.inl"
+#include "polymorphic_allocator.inl"
+#include "resource_adapter.inl"
+#include "ResultBlock.inl"
+#include "SimpleDelegate.inl"
+#include "State.inl"
+#include "strong_polymorphic_allocator.inl"
+#include "utility.inl"

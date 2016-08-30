@@ -34,7 +34,7 @@
 namespace eventual
 {
     namespace detail
-    {
+    {        
         template<class T>
         struct PlacementDestructor
         {
@@ -57,11 +57,11 @@ namespace eventual
         EVENTUAL_API std::exception_ptr CreateFutureExceptionPtr(std::future_errc error);
 
         template<class TFunctor, class TCallable, class Allocator>
-        static detail::enable_if_uses_allocator_t<TFunctor, Allocator>
+        static typename detail::enable_if_uses_allocator_t<TFunctor, Allocator>
             CreateFunctor(const Allocator& alloc, TCallable&& function);
 
         template<class TFunctor, class TCallable, class Allocator>
-        static detail::enable_if_doesnt_use_allocator_t<TFunctor, Allocator>
+        static typename detail::enable_if_doesnt_use_allocator_t<TFunctor, Allocator>
             CreateFunctor(const Allocator&, TCallable&& function);
     }
 }

@@ -4,13 +4,14 @@
 #include <memory>
 
 #include "../eventual_export.h"
+#include "traits.h"
 #include "polymorphic_allocator.h"
 #include "utility.h"
 
 namespace eventual
 {
     namespace detail
-    {
+    {        
         class SimpleDelegate
         {
             class Delegate
@@ -71,7 +72,7 @@ namespace eventual
 
         public:
 
-            template<class T, class = typename enable_if_not_same<SimpleDelegate, T>::type>
+            template<class T, class = enable_if_not_same_t<SimpleDelegate, T>>
             SimpleDelegate(T&& functor, const polymorphic_allocator<SimpleDelegate>& alloc);
 
             // only contructable in-place. No move/copy.

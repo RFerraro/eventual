@@ -1,14 +1,16 @@
+#if defined(EVENTUAL_HEADER_ONLY)
 #pragma once
+#endif
 
-#include "detail.h"
+#include "detail_methods.h"
 
 #include <memory>
 #include <tuple>
 
-#include "../future.h"
-#include "../eventual_methods.h"
-#include "memory_resource.h"
-#include "resource_adapter.h"
+#if !defined(EVENTUAL_HEADER_ONLY)
+#include "../eventual.inl"
+#include "detail.inl"
+#endif
 
 namespace eventual
 {

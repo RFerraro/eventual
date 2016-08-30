@@ -112,7 +112,8 @@ namespace eventual
                 CreateCallback(BasicTask<TFunctor, TResultType, TArgType>&& task, TArgType&& argument);
 
             template<class TFunctor, class TResultType, class TArgType>
-            static decltype(auto) CreateCallback(BasicTask<TFunctor, TResultType, TArgType&&>&& task, TArgType&& argument);
+            static decltype(auto) 
+                CreateCallback(BasicTask<TFunctor, TResultType, TArgType&&>&& task, TArgType&& argument);
 
             void ResetState();
 

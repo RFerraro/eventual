@@ -3,8 +3,6 @@ cmake_minimum_required(VERSION 3.0)
 include(GenerateExportHeader)
 project(eventual)
 
-option(HEADER_ONLY "Generate a header-only library")
-
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 set(eventual_headers
@@ -23,6 +21,7 @@ set(eventual_headers_detail
     ./detail/CommonPromise.h
     ./detail/CompositeState.h
     ./detail/detail.h
+    ./detail/detail_methods.h
     ./detail/FutureFactory.h
     ./detail/FutureHelper.h
     ./detail/memory_resource.h
@@ -36,6 +35,7 @@ set(eventual_headers_detail
     ./detail/utility.h)
     
 set(eventual_inline
+    ./eventual.inl
     ./eventual_methods.inl
     ./future.inl
     ./packaged_task.inl
@@ -49,6 +49,7 @@ set(eventual_inline_detail
     ./detail/CommonPromise.inl
     ./detail/CompositeState.inl
     ./detail/detail.inl
+    ./detail/detail_methods.inl
     ./detail/FutureFactory.inl
     ./detail/FutureHelper.inl
     ./detail/memory_resource.inl
@@ -67,7 +68,7 @@ set(eventual_source
     ./shared_future.cpp)
     
  set(eventual_source_detail
-    ./detail/detail.cpp
+    ./detail/detail_methods.cpp
     ./detail/memory_resource.cpp
     ./detail/SimpleDelegate.cpp
     ./detail/utility.cpp)
@@ -119,6 +120,7 @@ else()
     set(target_name eventual)
 
     add_library(${target_name} ${eventual_source_all})
+    target_compile_features(${target_name} PUBLIC cxx_alias_templates cxx_generic_lambdas)
 
 endif()
 

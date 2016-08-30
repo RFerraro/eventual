@@ -4,8 +4,8 @@
 #include <utility>
 #include <future>
 
-#include "future.h"
-#include "shared_future.h"
+#include "../future.h"
+#include "../shared_future.h"
 
 #include "State.h"
 #include "CompositeState.h"
@@ -129,7 +129,7 @@ namespace eventual
             auto state = std::move(_state);
 
             if (!state)
-                throw CreateFutureError(future_errc::no_state);
+                throw CreateFutureError(std::future_errc::no_state);
 
             return state;
         }
@@ -213,7 +213,7 @@ namespace eventual
 
         template<class R>
         template<class TFunctor, class TResultType, class TArgType>
-        static decltype(auto) BasicFuture<R>::CreateCallback(
+        decltype(auto) BasicFuture<R>::CreateCallback(
             BasicTask<TFunctor, TResultType, TArgType&>&& task,
             TArgType&& argument)
         {
@@ -229,7 +229,7 @@ namespace eventual
 
         template<class R>
         template<class TFunctor, class TResultType, class TArgType>
-        static decltype(auto) BasicFuture<R>::CreateCallback(
+        decltype(auto) BasicFuture<R>::CreateCallback(
             BasicTask<TFunctor, TResultType, TArgType>&& task,
             TArgType&& argument)
         {
@@ -245,7 +245,7 @@ namespace eventual
 
         template<class R>
         template<class TFunctor, class TResultType, class TArgType>
-        static decltype(auto) BasicFuture<R>::CreateCallback(
+        decltype(auto) BasicFuture<R>::CreateCallback(
             BasicTask<TFunctor, TResultType, TArgType&&>&& task,
             TArgType&& argument)
         {

@@ -1,4 +1,6 @@
+#if defined(EVENTUAL_HEADER_ONLY)
 #pragma once
+#endif
 
 #include "utility.h"
 

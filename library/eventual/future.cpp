@@ -1,11 +1,16 @@
+#if defined(EVENTUAL_HEADER_ONLY)
 #pragma once
+#endif
 
 #include "future.h"
 
 #include <utility>
 
 #include "shared_future.h"
-#include "detail/utility.h"
+
+#if !defined(EVENTUAL_HEADER_ONLY)
+#include "eventual.inl"
+#endif
 
 namespace eventual
 {

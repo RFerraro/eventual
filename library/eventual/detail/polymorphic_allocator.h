@@ -12,15 +12,16 @@ namespace eventual
         class polymorphic_allocator
         {
         public:
-            using value_type = typename T;
-            using pointer = typename value_type*;
-            using size_type = typename std::size_t;
+            //typedef T value_type;
+            using value_type = T;
+            using pointer = value_type*;
+            using size_type = std::size_t;
 
             // needed for libstdc++
-            using const_pointer = typename const pointer;
-            using reference = typename value_type&;
-            using const_reference = typename const reference;
-            using difference_type = typename std::ptrdiff_t;
+            using const_pointer = const pointer;
+            using reference = value_type&;
+            using const_reference = const reference;
+            using difference_type = std::ptrdiff_t;
 
             template<class U>
             struct rebind

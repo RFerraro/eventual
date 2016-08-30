@@ -28,11 +28,8 @@
 #include <utility>
 #include <memory>
 
-namespace
-{
-    constexpr long _Cpp14 = 201402L;
-    constexpr long _Cpp11 = 201103L;
-}
+//#include "../future.h"
+//#include "State.h"
 
 namespace eventual
 {
@@ -41,6 +38,12 @@ namespace eventual
     
     namespace detail
     {
+        namespace
+        {
+            constexpr long _Cpp14 = 201402L;
+            constexpr long _Cpp11 = 201103L;
+        }
+        
         template <class T> class State;
         template <class T> class StateNotificationShim;
 
@@ -106,17 +109,17 @@ namespace eventual
         template<class T>
         using enable_if_iterator_t = std::enable_if_t<is_iterator<T>::value, T>;
 
-        template<typename FirstType, typename SecondType, typename PlacementType = void>
-        using enable_if_not_same = std::enable_if<!std::is_same<std::decay_t<FirstType>, std::decay_t<SecondType>>::value, PlacementType>;
-
-        template<typename FirstType, typename SecondType, typename PlacementType = void>
-        using enable_if_not_same_t = typename enable_if_not_same<FirstType, SecondType, PlacementType>::type;
-
         template<class T, class Alloc, class U = T>
         using enable_if_uses_allocator_t = std::enable_if_t<std::uses_allocator<T, Alloc>::value, U>;
 
         template<class T, class Alloc, class U = T>
         using enable_if_doesnt_use_allocator_t = std::enable_if_t<!std::uses_allocator<T, Alloc>::value, U>;
+
+        template<typename FirstType, typename SecondType, typename PlacementType = void>
+        using enable_if_not_same = std::enable_if<!std::is_same<std::decay_t<FirstType>, std::decay_t<SecondType>>::value, PlacementType>;
+
+        template<typename FirstType, typename SecondType, typename PlacementType = void>
+        using enable_if_not_same_t = typename enable_if_not_same<FirstType, SecondType, PlacementType>::type;
 
         template<class T>
         struct unit_from_type
@@ -207,13 +210,13 @@ namespace eventual
         template<class T>
         struct get_state_result<State<T>>
         {
-            typedef typename T result_type;
+            typedef T result_type;
         };
 
         template<class T, class U>
         struct get_state_result<CompositeState<State<T>, U>>
         {
-            typedef typename T result_type;
+            typedef T result_type;
         };
 
         template<class T>

@@ -1,8 +1,14 @@
+#if defined(EVENTUAL_HEADER_ONLY)
 #pragma once
+#endif
 
 #include "eventual_methods.h"
 #include "future.h"
 #include "promise.h"
+
+#if !defined(EVENTUAL_HEADER_ONLY)
+#include "eventual.inl"
+#endif
 
 namespace eventual
 {
