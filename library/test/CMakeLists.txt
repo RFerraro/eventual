@@ -32,6 +32,10 @@ function(install_dependencies)
    if(install_dependencies_BUILD_TYPE STREQUAL "")
       set(install_dependencies_BUILD_TYPE "Debug")
    endif()
+
+   if(NOT DEFINED install_dependencies_BUILD_TYPE)
+      set(install_dependencies_BUILD_TYPE "Debug")
+   endif()
    
    if((DEFINED install_dependencies_RUNTIME) AND (NOT install_dependencies_RUNTIME STREQUAL ""))
       
