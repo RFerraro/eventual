@@ -6,3 +6,4 @@ cmake
 
 [options]
 gtest:shared=False
+gtest:include_pdbs=True

@@ -43,7 +43,8 @@ function(install_dependencies)
          RESULT_VARIABLE conan_result
          )
    elseif((DEFINED install_dependencies_LIBCXX) AND (NOT install_dependencies_LIBCXX STREQUAL ""))
-   
+      # Note: -build=missing works on windows but not linux, and --build=missing is vice-versa
+      # Todo: Update if/when conan client issue is fixed.
       execute_process(
          COMMAND conan install 
             "${install_dependencies_SOURCE_DIR}" 
@@ -51,7 +52,7 @@ function(install_dependencies)
             -s build_type=${install_dependencies_BUILD_TYPE} 
             -s compiler=${install_dependencies_COMPILER}
             -s compiler.libcxx=${install_dependencies_LIBCXX}
-            -build=missing
+            --build=missing
          WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
          RESULT_VARIABLE conan_result
          )    
