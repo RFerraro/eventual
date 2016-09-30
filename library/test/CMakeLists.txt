@@ -44,6 +44,8 @@ function(install_dependencies)
          RESULT_VARIABLE conan_result
          )
    elseif((DEFINED install_dependencies_LIBCXX) AND (NOT install_dependencies_LIBCXX STREQUAL ""))
+      
+      #temp: always build for GCC & clang... likely a alpine-musl compatabiltiy issue.
       execute_process(
          COMMAND conan install 
             "${install_dependencies_SOURCE_DIR}" 
@@ -51,7 +53,7 @@ function(install_dependencies)
             -s build_type=${install_dependencies_BUILD_TYPE} 
             -s compiler=${install_dependencies_COMPILER}
             -s compiler.libcxx=${install_dependencies_LIBCXX}
-            --build=missing
+            --build
          WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
          RESULT_VARIABLE conan_result
          )    
