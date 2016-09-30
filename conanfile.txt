@@ -1,9 +1,8 @@
 [requires]
-gtest/1.7.0@RFerraro/stable
+gtest/1.7.0@lasote/stable
 
 [generators]
 cmake
 
 [options]
 gtest:shared=False
-gtest:include_pdbs=True
