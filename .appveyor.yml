@@ -1,0 +1,44 @@
+version: 0.9.2.{build}
+os: Visual Studio 2015
+configuration:
+- Debug
+- Release
+
+environment:
+  PATH: C:\Program Files\OpenCppCoverage;C:\Python34;C:\Python34\Scripts;%PATH%
+    
+  matrix:
+    - GENERATOR: Visual Studio 14 2015
+      CODECOV_FLAG: vs2015_x86
+    - GENERATOR: Visual Studio 14 2015 Win64
+      CODECOV_FLAG: vs2015_x64
+
+cache:
+- C:\Users\AppVeyor\.conan -> cache.txt
+- C:\Users\AppVeyor\AppData\Local\pip\Cache -> cache.txt
+- C:\Users\AppVeyor\AppData\Local\Temp\chocolatey -> cache.txt
+
+install:
+- cinst opencppcoverage
+- pip install conan
+- pip install codecov
+
+before_build:
+- cmake -Bbuild -H"." -G "%GENERATOR%"
+
+build:
+  project: .\build\eventual.sln
+  verbosity: minimal
+  
+test_script:
+- ps: '.\tools\appveyor\run_tests.ps1'
+
+after_test:
+- ps: >-
+   if(Test-Path '.\coverage_results.xml')
+   {
+     &codecov -X gcov -F "$ENV:CODECOV_FLAG" -f ".\coverage_results.xml"
+   }
+
+#on_finish:
+#- ps: $blockRdp = $true; iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
