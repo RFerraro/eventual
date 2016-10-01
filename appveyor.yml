@@ -5,7 +5,7 @@ configuration:
 - Release
 
 environment:
-  PATH: C:\Python34;C:\Python34\Scripts;%PATH%
+  PATH: C:\Program Files\OpenCppCoverage;C:\Python34;C:\Python34\Scripts;%PATH%
     
   matrix:
     - GENERATOR: Visual Studio 14 2015
@@ -15,11 +15,11 @@ environment:
 
 cache:
 - C:\Users\AppVeyor\.conan -> cache.txt
-- C:\Users\AppVeyor\Downloads -> cache.txt
 - C:\Users\AppVeyor\AppData\Local\pip\Cache -> cache.txt
+- C:\Users\AppVeyor\AppData\Local\Temp\chocolatey -> cache.txt
 
 install:
-- ps: '.\tools\appveyor\install_opencppcoverage.ps1'
+- cinst opencppcoverage
 - pip install conan
 - pip install codecov
 

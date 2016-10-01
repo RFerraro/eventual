@@ -6,7 +6,7 @@ $testExe = "test.exe"
 $testPath = [System.IO.Path]::Combine($Env:APPVEYOR_BUILD_FOLDER, "build", "library", "test", $Env:Configuration, $testExe)
 $includePath = [System.IO.Path]::Combine($Env:APPVEYOR_BUILD_FOLDER, "library", "eventual", "include")
 $testCoveragePath = [System.IO.Path]::Combine($Env:APPVEYOR_BUILD_FOLDER, "coverage_results")
-$testConfiguration = ($env:CONFIGURATION + "-" + $env:PLATFORM)
+$testConfiguration = ($env:CONFIGURATION + "-" + $env:CODECOV_FLAG)
 $coberturaFile = [System.IO.Path]::Combine($Env:APPVEYOR_BUILD_FOLDER, "coverage_results.xml")
 
 function Read-Test-Case
