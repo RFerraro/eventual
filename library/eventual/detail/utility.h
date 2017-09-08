@@ -56,8 +56,7 @@ namespace eventual
 
         inline std::future_error CreateFutureError(std::future_errc error)
         {
-            auto code = std::make_error_code(error);
-            return std::future_error(code);
+            return std::future_error(error);
         }
 
         inline std::exception_ptr CreateFutureExceptionPtr(std::future_errc error)
