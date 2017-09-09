@@ -13,13 +13,11 @@ matrix:
    fast-finish: true
       
 env:
-   global:
-      - DOCKER_NAME=rferraro/cxx-travis-ci
    matrix:
-      - DOCKER_TAG=clang-3.7.1 CONFIGURATION=Debug
-      - DOCKER_TAG=clang-3.7.1 CONFIGURATION=Release
-      - DOCKER_TAG=gcc-5.3.0   CONFIGURATION=Debug
-      - DOCKER_TAG=gcc-5.3.0   CONFIGURATION=Release
+      - DOCKER_NAME=rferraro/cxx-clang DOCKER_TAG=3.7.1 CONFIGURATION=Debug
+      - DOCKER_NAME=rferraro/cxx-clang DOCKER_TAG=3.7.1 CONFIGURATION=Release
+      - DOCKER_NAME=rferraro/cxx-gcc   DOCKER_TAG=5.3.0 CONFIGURATION=Debug
+      - DOCKER_NAME=rferraro/cxx-gcc   DOCKER_TAG=5.3.0 CONFIGURATION=Release
 
 install:
    - docker pull "${DOCKER_NAME}:${DOCKER_TAG}"
