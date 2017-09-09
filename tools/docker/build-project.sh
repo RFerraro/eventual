@@ -64,6 +64,14 @@ fi
 mkdir -p $BuildPath
 pushd $BuildPath
 
+echo "Installing latest Conan C/C++ package manager."
+pip install conan
+conan --version
+
+# Update conan data directory for caching by the CI environment.
+echo "Setting conan data path to: /tmp/conan"
+conan config set storage.path=/tmp/conan
+
 echo "Configuring: cmake -DCMAKE_BUILD_TYPE=\"${CONFIGURATION}\" $SourcePath"
 cmake -DCMAKE_BUILD_TYPE="${CONFIGURATION}" $SourcePath
 
