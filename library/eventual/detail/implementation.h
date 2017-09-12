@@ -544,7 +544,7 @@ namespace eventual
                 };
 
                 thread_local ExitNotifier notifier;
-                notifier.Add(move(block));
+                notifier.Add(std::move(block));
             }
 
             bool SetHasResult()
@@ -1121,8 +1121,8 @@ namespace eventual
 
                 return
                     [
-                        task = forward<task_t>(task),
-                        argument = forward<TArgType>(argument)
+                        task = std::forward<task_t>(task),
+                        argument = std::forward<TArgType>(argument)
                     ]() mutable { task(argument); };
             }
 
@@ -1136,9 +1136,9 @@ namespace eventual
 
                 return
                     [
-                        task = forward<task_t>(task),
-                        argument = forward<TArgType>(argument)
-                    ]() mutable { task(move(argument)); };
+                        task = std::forward<task_t>(task),
+                        argument = std::forward<TArgType>(argument)
+                    ]() mutable { task(std::move(argument)); };
             }
 
             template<class TFunctor, class TResultType, class TArgType>
@@ -1151,9 +1151,9 @@ namespace eventual
 
                 return
                     [
-                        task = forward<task_t>(task),
-                        argument = forward<TArgType>(argument)
-                    ]() mutable { task(move(argument)); };
+                        task = std::forward<task_t>(task),
+                        argument = std::forward<TArgType>(argument)
+                    ]() mutable { task(std::move(argument)); };
             }
 
             void ResetState()
