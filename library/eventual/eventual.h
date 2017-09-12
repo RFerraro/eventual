@@ -481,7 +481,7 @@ namespace eventual
         using namespace eventual::detail;
         using result_t = when_any_result<tuple<decay_t<Futures>...>>;
 
-        auto futuresSequence = make_tuple<decay_t<Futures>...>(forward<Futures>(futures)...);
+        auto futuresSequence = make_tuple<decay_t<Futures>...>(std::forward<Futures>(futures)...);
         auto indexPromise = make_shared<promise<size_t>>();
         auto indexfuture = indexPromise->get_future();
 
@@ -559,11 +559,11 @@ namespace eventual
             using namespace std;
             using task_t = get_continuation_task_t<TFuture, TContinuation>;
 
-            auto current = forward<TFuture>(future);
+            auto current = std::forward<TFuture>(future);
             auto state = current.ValidateState();
             auto allocator = state->Get_Allocator();
 
-            task_t task(allocator_arg_t(), allocator, forward<TContinuation>(continuation));
+            task_t task(allocator_arg_t(), allocator, std::forward<TContinuation>(continuation));
             auto taskFuture = GetUnwrappedFuture(task);
 
             state->SetCallback(CreateCallback(std::move(task), std::move(current)));
@@ -579,7 +579,7 @@ namespace eventual
         {
             using namespace std;
 
-            auto tailfuture = When_All_(forward<Futures>(others)...);
+            auto tailfuture = When_All_(std::forward<Futures>(others)...);
             return tailfuture.then([head = move(head)](auto& tf) mutable
             {
                 return head.then([tf = move(tf)](auto& h) mutable
