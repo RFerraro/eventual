@@ -400,8 +400,7 @@ namespace eventual
     detail::all_futures_vector<InputIterator>
         when_all(InputIterator first, InputIterator last)
     {
-        using namespace std;
-        using future_vector_t = vector<typename iterator_traits<InputIterator>::value_type>;
+        using future_vector_t = std::vector<typename std::iterator_traits<InputIterator>::value_type>;
 
         auto vectorfuture = make_ready_future(future_vector_t());
 
@@ -435,15 +434,14 @@ namespace eventual
     detail::any_future_result_vector<InputIterator>
         when_any(InputIterator first, InputIterator last)
     {
-        using namespace std;
         using namespace eventual::detail;
-        using future_t = typename iterator_traits<InputIterator>::value_type;
-        using result_t = when_any_result<vector<future_t>>;
+        using future_t = typename std::iterator_traits<InputIterator>::value_type;
+        using result_t = when_any_result<std::vector<future_t>>;
 
         constexpr auto noIdx = size_t(-1);
-        auto indexPromise = make_shared<promise<size_t>>();
+        auto indexPromise = std::make_shared<promise<size_t>>();
         auto indexfuture = indexPromise->get_future();
-        vector<future_t> futures;
+        std::vector<future_t> futures;
 
         size_t index = 0;
         for (auto iterator = first; iterator != last; ++iterator)
@@ -477,12 +475,11 @@ namespace eventual
     detail::any_futures_result_tuple<Futures...>
         when_any(Futures&&... futures)
     {
-        using namespace std;
         using namespace eventual::detail;
-        using result_t = when_any_result<tuple<decay_t<Futures>...>>;
+        using result_t = when_any_result<std::tuple<std::decay_t<Futures>...>>;
 
-        auto futuresSequence = make_tuple<decay_t<Futures>...>(std::forward<Futures>(futures)...);
-        auto indexPromise = make_shared<promise<size_t>>();
+        auto futuresSequence = std::make_tuple<std::decay_t<Futures>...>(std::forward<Futures>(futures)...);
+        auto indexPromise = std::make_shared<promise<size_t>>();
         auto indexfuture = indexPromise->get_future();
 
         size_t index = 0;
@@ -556,14 +553,13 @@ namespace eventual
         template<class TContinuation, class TFuture>
         decltype(auto) detail::BasicFuture<R>::ThenImpl(TContinuation&& continuation, TFuture&& future)
         {
-            using namespace std;
             using task_t = get_continuation_task_t<TFuture, TContinuation>;
 
             auto current = std::forward<TFuture>(future);
             auto state = current.ValidateState();
             auto allocator = state->Get_Allocator();
 
-            task_t task(allocator_arg_t(), allocator, std::forward<TContinuation>(continuation));
+            task_t task(std::allocator_arg_t(), allocator, std::forward<TContinuation>(continuation));
             auto taskFuture = GetUnwrappedFuture(task);
 
             state->SetCallback(CreateCallback(std::move(task), std::move(current)));
@@ -577,16 +573,14 @@ namespace eventual
         template<class Future, class... Futures>
         decltype(auto) When_All_(Future&& head, Futures&&... others)
         {
-            using namespace std;
-
-            auto tailfuture = When_All_(std::forward<Futures>(others)...);
-            return tailfuture.then([head = std::move(head)](auto& tf) mutable
-            {
-                return head.then([tf = std::move(tf)](auto& h) mutable
-                {
-                    return tuple_cat(make_tuple(std::move(h)), tf.get());
-                });
-            });
+            return When_All_(std::forward<Futures>(others)...)
+               .then([head = std::forward<Future>(head)](auto&& tf) mutable
+               {
+                  return head.then([tf = std::forward<std::decay_t<decltype(tf)>>(tf)](auto&& h) mutable
+                  {
+                      return std::tuple_cat(std::make_tuple(std::forward<Future>(h)), tf.get());
+                  });
+               });
         }
 
         inline future<std::tuple<>> When_All_()
