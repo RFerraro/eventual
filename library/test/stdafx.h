@@ -9,15 +9,12 @@
 #include <gtest/gtest.h>
 #include <eventual/eventual.h>
 
-template class eventual::future<void>;
 template class eventual::future<int>;
 template class eventual::future<int&>;
 
-template class eventual::shared_future<void>;
 template class eventual::shared_future<int>;
 template class eventual::shared_future<int&>;
 
-template class eventual::promise<void>;
 template class eventual::promise<int>;
 template class eventual::promise<int&>;
 
