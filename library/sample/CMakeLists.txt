@@ -34,6 +34,15 @@ elseif((CMAKE_CXX_COMPILER_ID MATCHES "Clang") OR (CMAKE_CXX_COMPILER_ID MATCHES
    
 endif()
 
+# Workaround for GCC > 6.0;
+# See Bug 80916- https://gcc.gnu.org/bugzilla/show_bug.cgi?id=80916
+if((CMAKE_BUILD_TYPE MATCHES "Release") AND (CMAKE_CXX_COMPILER_ID MATCHES "GNU") AND (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 6.0) AND (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 8.0))
+   
+   target_compile_options(Sample PUBLIC
+                          "-Wno-error=unused-function")
+   
+endif()
+
 install(
         TARGETS
             Sample

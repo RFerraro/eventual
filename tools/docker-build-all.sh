@@ -30,12 +30,24 @@ function test-image
 
 mkdir -p $LocalConanData
 
-test-image rferraro/cxx-travis-ci:gcc-5.3.0 Debug
-test-image rferraro/cxx-travis-ci:clang-3.8.0 Debug
-test-image rferraro/cxx-travis-ci:clang-3.7.1 Debug
+test-image rferraro/cxx-clang:3.7 Debug
+test-image rferraro/cxx-clang:3.8 Debug
+test-image rferraro/cxx-clang:3.9 Debug
+test-image rferraro/cxx-clang:4.0 Debug
+test-image rferraro/cxx-clang:5.0 Debug
 
-test-image rferraro/cxx-travis-ci:gcc-5.3.0 Release
-test-image rferraro/cxx-travis-ci:clang-3.8.0 Release
-test-image rferraro/cxx-travis-ci:clang-3.7.1 Release
+test-image rferraro/cxx-clang:3.7 Release
+test-image rferraro/cxx-clang:3.8 Release
+test-image rferraro/cxx-clang:3.9 Release
+test-image rferraro/cxx-clang:4.0 Release
+test-image rferraro/cxx-clang:5.0 Release
+
+test-image rferraro/cxx-gcc:5.x Debug
+test-image rferraro/cxx-gcc:6.x Debug
+test-image rferraro/cxx-gcc:7.x Debug
+
+test-image rferraro/cxx-gcc:5.x Release
+test-image rferraro/cxx-gcc:6.x Release
+test-image rferraro/cxx-gcc:7.x Release
 
 docker images

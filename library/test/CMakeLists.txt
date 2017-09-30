@@ -24,7 +24,6 @@ else()
    message(WARNING "WARNING: connan.io may not support compiler: ${CMAKE_CXX_COMPILER_ID}")
 endif()
 
-
 function(install_dependencies)
    set(install_args SOURCE_DIR ARCH BUILD_TYPE COMPILER RUNTIME LIBCXX OUTPUT_FILE)
    cmake_parse_arguments(install_dependencies "" "${install_args}" "" ${ARGN} )
@@ -45,7 +44,6 @@ function(install_dependencies)
          )
    elseif((DEFINED install_dependencies_LIBCXX) AND (NOT install_dependencies_LIBCXX STREQUAL ""))
       
-      #temp: always build for GCC & clang... likely a alpine-musl compatabiltiy issue.
       execute_process(
          COMMAND conan install 
             "${install_dependencies_SOURCE_DIR}" 
@@ -53,7 +51,7 @@ function(install_dependencies)
             -s build_type=${install_dependencies_BUILD_TYPE} 
             -s compiler=${install_dependencies_COMPILER}
             -s compiler.libcxx=${install_dependencies_LIBCXX}
-            --build
+            --build=missing
          WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
          RESULT_VARIABLE conan_result
          )    
@@ -190,7 +188,13 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
    target_compile_options(Test PUBLIC
                           "$<$<CONFIG:Debug>:-fno-inline>"
                           "$<$<CONFIG:Debug>:-fno-inline-small-functions>"
-                          "$<$<CONFIG:Debug>:-fno-default-inline>"
-                          )
+                          "$<$<CONFIG:Debug>:-fno-default-inline>")
+   
+   # Workaround for GCC > 6.0;
+   # See Bug 80916- https://gcc.gnu.org/bugzilla/show_bug.cgi?id=80916
+   if((CMAKE_BUILD_TYPE MATCHES "Release") AND (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 6.0) AND (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 8.0))
+      target_compile_options(Test PUBLIC
+                             "-Wno-error=unused-function")
+   endif()
 endif()
 

@@ -46,8 +46,12 @@ TEST(PackagedTaskTest, ConstructorWithAllocatorCreatesValidTask)
     };
 
     large capture;
+    capture.data[0] = 5;
 
-    packaged_task<int(int)> task(std::allocator_arg_t(), alloc, [capture](int i) { return  i; });
+    packaged_task<int(int)> task(
+        std::allocator_arg_t(), 
+        alloc, 
+        [capture](int i) { return static_cast<int>(i + capture.data[0]); });
 
     // Act/Assert
     EXPECT_TRUE(task.valid());
@@ -255,7 +259,7 @@ TEST(PackagedTaskTest, Execute_ForwardsTaskExceptions)
 TEST(PackagedTaskTest, Execute_ForwardsTaskExceptions_FutureError)
 {
    // Arrange
-   packaged_task<int(int)> task([](int) -> int { throw std::future_error(std::make_error_code(std::future_errc::no_state)); });
+   packaged_task<int(int)> task([](int) -> int { throw std::future_error(std::future_errc::no_state); });
    auto future = task.get_future();
 
    // Act
@@ -268,7 +272,7 @@ TEST(PackagedTaskTest, Execute_ForwardsTaskExceptions_FutureError)
 TEST(PackagedTaskTest, ExecuteWithVoid_ForwardsTaskExceptions_FutureError)
 {
     // Arrange
-    packaged_task<void(int)> task([](int) { throw std::future_error(std::make_error_code(std::future_errc::no_state)); });
+    packaged_task<void(int)> task([](int) { throw std::future_error(std::future_errc::no_state); });
     auto future = task.get_future();
 
     // Act
@@ -432,7 +436,7 @@ TEST(PackagedTaskTest, MakeReadyAtThreadExitVoid_ForwardsTaskExceptions)
 TEST(PackagedTaskTest, MakeReadyAtThreadExit_ForwardsTaskExceptions_FutureError)
 {
    // Arrange
-   packaged_task<int(int)> task([](int) -> int { throw std::future_error(std::make_error_code(std::future_errc::no_state)); });
+   packaged_task<int(int)> task([](int) -> int { throw std::future_error(std::future_errc::no_state); });
    auto future = task.get_future();
 
    std::mutex m;
@@ -462,7 +466,7 @@ TEST(PackagedTaskTest, MakeReadyAtThreadExit_ForwardsTaskExceptions_FutureError)
 TEST(PackagedTaskTest, MakeReadyAtThreadExitVoid_ForwardsTaskExceptions_FutureError)
 {
     // Arrange
-    packaged_task<void(int)> task([](int) { throw std::future_error(std::make_error_code(std::future_errc::no_state)); });
+    packaged_task<void(int)> task([](int) { throw std::future_error(std::future_errc::no_state); });
     auto future = task.get_future();
 
     std::mutex m;
