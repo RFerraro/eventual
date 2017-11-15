@@ -14,14 +14,14 @@ matrix:
       
 env:
    matrix:
-      - DOCKER_NAME=rferraro/cxx-clang DOCKER_TAG=3.7 CONFIGURATION=Debug
-      - DOCKER_NAME=rferraro/cxx-clang DOCKER_TAG=3.8 CONFIGURATION=Debug
+      - DOCKER_NAME=rferraro/cxx-clang DOCKER_TAG=3.7 CONFIGURATION=Debug CXXFLAGS=-D__float128=void
+      - DOCKER_NAME=rferraro/cxx-clang DOCKER_TAG=3.8 CONFIGURATION=Debug CXXFLAGS=-D__float128=void
       - DOCKER_NAME=rferraro/cxx-clang DOCKER_TAG=3.9 CONFIGURATION=Debug
       - DOCKER_NAME=rferraro/cxx-clang DOCKER_TAG=4.0 CONFIGURATION=Debug
       - DOCKER_NAME=rferraro/cxx-clang DOCKER_TAG=5.0 CONFIGURATION=Debug
       
-      - DOCKER_NAME=rferraro/cxx-clang DOCKER_TAG=3.7 CONFIGURATION=Release
-      - DOCKER_NAME=rferraro/cxx-clang DOCKER_TAG=3.8 CONFIGURATION=Release
+      - DOCKER_NAME=rferraro/cxx-clang DOCKER_TAG=3.7 CONFIGURATION=Release CXXFLAGS=-D__float128=void
+      - DOCKER_NAME=rferraro/cxx-clang DOCKER_TAG=3.8 CONFIGURATION=Release CXXFLAGS=-D__float128=void
       - DOCKER_NAME=rferraro/cxx-clang DOCKER_TAG=3.9 CONFIGURATION=Release
       - DOCKER_NAME=rferraro/cxx-clang DOCKER_TAG=4.0 CONFIGURATION=Release
       - DOCKER_NAME=rferraro/cxx-clang DOCKER_TAG=5.0 CONFIGURATION=Release
