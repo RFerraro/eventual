@@ -1,5 +1,4 @@
 version: 0.9.2.{build}
-os: Visual Studio 2015
 configuration:
 - Debug
 - Release
@@ -8,9 +7,17 @@ environment:
   PATH: C:\Program Files\OpenCppCoverage;C:\Python34;C:\Python34\Scripts;%PATH%
     
   matrix:
-    - GENERATOR: Visual Studio 14 2015
+    - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+      GENERATOR: Visual Studio 15 2017
+      CODECOV_FLAG: vs2017_x86
+    - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+      GENERATOR: Visual Studio 15 2017 Win64
+      CODECOV_FLAG: vs2017_x64
+    - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
+      GENERATOR: Visual Studio 14 2015
       CODECOV_FLAG: vs2015_x86
-    - GENERATOR: Visual Studio 14 2015 Win64
+    - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
+      GENERATOR: Visual Studio 14 2015 Win64
       CODECOV_FLAG: vs2015_x64
 
 cache:
