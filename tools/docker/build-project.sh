@@ -83,6 +83,9 @@ function install_conan
     pip install conan
     conan --version
     
+    echo "Configuring bincrafters source for Conan."
+    conan remote add bincrafters https://api.bintray.com/conan/bincrafters/public-conan
+    
     #echo "Configuring custom settings for Conan."
     #write_conan_settings
 
