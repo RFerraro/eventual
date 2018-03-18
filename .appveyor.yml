@@ -28,7 +28,8 @@ cache:
 install:
 - cinst opencppcoverage
 - pip install conan
-- pip install codecov
+# https://github.com/codecov/codecov-python/issues/139
+- pip install codecov=2.0.14
 
 before_build:
 - conan remote add bincrafters https://api.bintray.com/conan/bincrafters/public-conan
