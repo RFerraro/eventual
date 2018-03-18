@@ -496,8 +496,13 @@ namespace eventual
 
             void InvokeContinuations()
             {
-                for (auto& cb : _callbacks)
-                    cb(); // todo: exceptions?
+                auto current = _callbacks.begin();
+                while (current != _callbacks.end())
+                {
+                    (*current)(); // todo: exceptions?
+                    current++;
+                    _callbacks.pop_front(); // break circular references.
+                }
             }
 
             void Wait(unique_lock& lock) const
