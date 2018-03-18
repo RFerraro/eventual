@@ -12,10 +12,32 @@ namespace
    class PromiseTestException { };
 
    template<class R>
-   void CompletePromise(promise<R>& promise)
+   void CompletePromiseWithException(promise<R>& promise)
    {
       struct Anonymous { };
       promise.set_exception(std::make_exception_ptr(Anonymous()));
+   }
+
+   template<class R>
+   void CompletePromise(promise<R>& promise)
+   {
+       promise.set_value(R{});
+   }
+
+   template<class R>
+   void CompletePromise(promise<R&>& promise)
+   {
+       using result_type = std::remove_reference_t<R>;
+       static result_type result{};
+       
+       struct Anonymous { };
+       promise.set_value(result);
+   }
+
+   template<>
+   void CompletePromise(promise<void>& promise)
+   {
+       promise.set_value();
    }
 }
 
@@ -74,12 +96,34 @@ TYPED_TEST(PromiseTest, DestructorReleasesState)
 
    {
       promise<TypeParam> promise(std::allocator_arg_t(), alloc);
-      CompletePromise(promise);
+      CompletePromiseWithException(promise);
 
    } // Act
    
    // Assert
    EXPECT_EQ(0, alloc.GetCount()) << "Custom allocator did not deallocate all the objects it created.";
+}
+
+TYPED_TEST(PromiseTest, Destructor_ReleasesWaitingContinuations)
+{
+    // Arrange
+    auto continuationInvoked = false;
+    struct data
+    {
+        char _block[128] = { 0 };
+    };
+
+    auto shared_data = std::make_shared<data>();
+
+    {
+        promise<TypeParam> promise{};
+        auto future = promise.get_future();
+
+        future.then([shared_data, &continuationInvoked](auto&) { continuationInvoked = true; });
+    } // Act
+
+    // Assert
+    EXPECT_EQ(1, shared_data.use_count());
 }
 
 TYPED_TEST(PromiseTest, DestructorSignalsBrokenPromiseIfNotComplete)
@@ -292,7 +336,55 @@ TYPED_TEST(PromiseTest, SetExceptionAtThreadExit_ThrowsIfPromiseSatisfied)
    EXPECT_TRUE(result.load()) << "Promise set an exception when already satisfied.";
 }
 
+TYPED_TEST(PromiseTest, SetException_ReleasesContinuations)
+{
+    // Arrange
+    auto continuationInvoked = false;
+    struct data
+    {
+        char _block[128] = { 0 };
+    };
+
+    auto shared_data = std::make_shared<data>();
+
+    promise<TypeParam> promise{};
+    auto future = promise.get_future();
+
+    future.then([shared_data, &continuationInvoked](auto&) { continuationInvoked = true; });
+
+    // Act
+    CompletePromiseWithException(promise);
+
+    // Assert
+    EXPECT_TRUE(continuationInvoked);
+    EXPECT_EQ(1, shared_data.use_count());
+}
+
 // Set_Value
+
+TYPED_TEST(PromiseTest, SetValue_ReleasesContinuations)
+{
+    // Arrange
+    auto continuationInvoked = false;
+    struct data
+    {
+        char _block[128] = { 0 };
+    };
+
+    auto shared_data = std::make_shared<data>();
+
+    promise<TypeParam> promise{};
+    auto future = promise.get_future();
+
+    future.then([shared_data, &continuationInvoked](auto&) { continuationInvoked = true; });
+
+    // Act
+    CompletePromise(promise);
+
+    // Assert
+    EXPECT_TRUE(continuationInvoked);
+    EXPECT_EQ(1, shared_data.use_count());
+}
 
 TEST(PromiseTest_Value, SetValue_CopiesValueIntoState)
 {
