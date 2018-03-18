@@ -83,8 +83,8 @@ function install_conan
     pip install conan
     conan --version
     
-    echo "Configuring custom settings for Conan."
-    write_conan_settings
+    #echo "Configuring custom settings for Conan."
+    #write_conan_settings
 
     # Update conan data directory for caching by the CI environment.
     echo "Setting conan data path to: /tmp/conan"
