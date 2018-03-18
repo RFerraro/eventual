@@ -37,7 +37,6 @@ function(install_dependencies)
             -s build_type=${install_dependencies_BUILD_TYPE} 
             -s compiler=${install_dependencies_COMPILER} 
             -s compiler.runtime=${install_dependencies_RUNTIME} 
-            -o gtest:include_pdbs=True
             --build=missing
          WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
          RESULT_VARIABLE conan_result
