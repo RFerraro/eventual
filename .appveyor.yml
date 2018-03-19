@@ -21,7 +21,7 @@ environment:
       CODECOV_FLAG: vs2015_x64
 
 cache:
-- C:\Users\AppVeyor\.conan -> cache.txt
+- C:\Users\AppVeyor\.conan\data -> cache.txt
 - C:\Users\AppVeyor\AppData\Local\pip\Cache -> cache.txt
 - C:\Users\AppVeyor\AppData\Local\Temp\chocolatey -> cache.txt
 
@@ -32,6 +32,7 @@ install:
 - pip install codecov==2.0.9
 
 before_build:
+- conan --version
 - conan remote add bincrafters https://api.bintray.com/conan/bincrafters/public-conan
 - cmake -Bbuild -H"." -G "%GENERATOR%"
 
