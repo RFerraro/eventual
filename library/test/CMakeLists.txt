@@ -37,7 +37,6 @@ function(install_dependencies)
             -s build_type=${install_dependencies_BUILD_TYPE} 
             -s compiler=${install_dependencies_COMPILER} 
             -s compiler.runtime=${install_dependencies_RUNTIME} 
-            -o gtest:include_pdbs=True
             --build=missing
          WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
          RESULT_VARIABLE conan_result
@@ -164,6 +163,11 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
                           "$<$<BOOL:${is_x86_64}>:/bigobj>" 
                           "$<$<CONFIG:Debug>:/MTd>" 
                           "$<$<CONFIG:Release>:/MT>")
+   
+   # Todo: updating GTest to the latest version should negate the need for this...
+   # Or: https://blogs.msdn.microsoft.com/vcblog/2017/12/13/broken-warnings-theory/
+   target_compile_definitions(Test PRIVATE _SILENCE_TR1_NAMESPACE_DEPRECATION_WARNING=1)
+                          
    set_target_properties(Test PROPERTIES LINK_FLAGS "/WX")
 else()
    #clang/gcc...
