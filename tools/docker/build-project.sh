@@ -111,7 +111,7 @@ if [ $ci_analyse_coverage -eq 1 ]; then
 		include_pattern="*$( echo "${source_path}" | tr / \# )*.gcov"
 		gcov_files=$(find . -type f -name "${include_pattern}" | while read data; do echo -f ${data}; done | xargs)
 	
-		bash <(curl -s https://codecov.io/bash) -X gcov -X coveragepy -X fix -Z -F "${CC}" ${gcov_files}
+		bash <(curl -s https://codecov.io/bash) -X gcov -X coveragepy -Z -F "${CC}" ${gcov_files}
 	fi
 	
 	popd
