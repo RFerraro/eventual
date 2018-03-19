@@ -32,7 +32,7 @@ install:
 - pip install codecov==2.0.9
 
 before_build:
-- ps: (&conan remote add bincrafters https://api.bintray.com/conan/bincrafters/public-conan) *>&1
+- conan remote add bincrafters https://api.bintray.com/conan/bincrafters/public-conan
 - cmake -Bbuild -H"." -G "%GENERATOR%"
 
 build:
